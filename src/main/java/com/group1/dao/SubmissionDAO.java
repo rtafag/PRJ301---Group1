@@ -7,5 +7,6 @@ public interface SubmissionDAO {
     void insert(Submission submission);
     Submission getById(String submissionId);
     List<Submission> getAll();
+    void updateScore(String submissionId, double newScore, String scorePublicTime);
     void truncateTable(); 
 }

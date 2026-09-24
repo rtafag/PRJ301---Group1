@@ -96,6 +96,22 @@ public class SubmissionDAOImpl implements SubmissionDAO {
     }
 
     @Override
+    public void updateScore(String submissionId, double newScore, String scorePublicTime) {
+        String sql = "UPDATE submissions SET score = ?, scorePublicTime = ? WHERE submissionId = ?";
+        try (Connection conn = getConnection();
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
+
+            pstmt.setDouble(1, newScore);
+            pstmt.setString(2, scorePublicTime);
+            pstmt.setString(3, submissionId);
+            pstmt.executeUpdate();
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
     public void truncateTable() {
         String sql = "TRUNCATE TABLE submissions";
         try (Connection conn = getConnection();
