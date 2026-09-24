@@ -8,23 +8,21 @@ public class AitaRecord {
     private int age;
     private String role; 
     private String submissionId;
-    private String analystId;
     private String status; // active or offline
 
     public AitaRecord() {}
 
-    public AitaRecord(String userId, String name, String email, int age, String role, String submissionId, String analystId, String status) {
+    public AitaRecord(String userId, String name, String email, int age, String role, String submissionId, String status) {
         this.userId = userId;
         this.name = name;
         this.email = email;
         this.age = age;
         this.role = role;
         this.submissionId = submissionId;
-        this.analystId = analystId;
         this.status = status;
     }
 
-    public AitaRecord(int dbId, String userId, String name, String email, int age, String role, String submissionId, String analystId, String status) {
+    public AitaRecord(int dbId, String userId, String name, String email, int age, String role, String submissionId, String status) {
         this.dbId = dbId;
         this.userId = userId;
         this.name = name;
@@ -32,7 +30,6 @@ public class AitaRecord {
         this.age = age;
         this.role = role;
         this.submissionId = submissionId;
-        this.analystId = analystId;
         this.status = status;
     }
 
@@ -50,8 +47,6 @@ public class AitaRecord {
     public void setRole(String role) { this.role = role; }
     public String getSubmissionId() { return submissionId; }
     public void setSubmissionId(String submissionId) { this.submissionId = submissionId; }
-    public String getAnalystId() { return analystId; }
-    public void setAnalystId(String analystId) { this.analystId = analystId; }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; }
 

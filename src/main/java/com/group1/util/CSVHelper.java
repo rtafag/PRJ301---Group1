@@ -10,7 +10,6 @@ import java.util.List;
 
 public class CSVHelper {
 
-    // Đọc danh sách user (học sinh / giáo viên) từ CSV
     public static List<AitaRecord> readUsersFromCSV(String filePath) {
         List<AitaRecord> records = new ArrayList<>();
         String line = "";
@@ -22,17 +21,16 @@ public class CSVHelper {
             while ((line = br.readLine()) != null) {
                 String[] data = line.split(cvsSplitBy, -1);
                 
-                if(data.length >= 8) {
+                if(data.length >= 7) {
                     String userId = data[0].trim();
                     String name = data[1].trim();
                     String email = data[2].trim();
                     int age = data[3].trim().isEmpty() ? 0 : Integer.parseInt(data[3].trim());
                     String role = data[4].trim();
                     String submissionId = data[5].trim();
-                    String analystId = data[6].trim();
-                    String status = data[7].trim(); // active or offline
+                    String status = data[6].trim(); // active or offline
                     
-                    records.add(new AitaRecord(userId, name, email, age, role, submissionId, analystId, status));
+                    records.add(new AitaRecord(userId, name, email, age, role, submissionId, status));
                 }
             }
         } catch (IOException e) {
@@ -41,7 +39,6 @@ public class CSVHelper {
         return records;
     }
 
-    // Đọc danh sách Submissions từ CSV
     public static List<Submission> readSubmissionsFromCSV(String filePath) {
         List<Submission> submissions = new ArrayList<>();
         String line = "";

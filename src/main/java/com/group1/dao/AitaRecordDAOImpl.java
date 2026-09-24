@@ -19,7 +19,6 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
     }
 
     private void createTableIfNotExists() {
-        // Cập nhật schema, thêm cột status
         String sql = "IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
                      "CREATE TABLE aita_records (" +
                      "dbId INT PRIMARY KEY IDENTITY(1,1), " +
@@ -29,18 +28,21 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                      "age INT, " +
                      "role NVARCHAR(50), " +
                      "submissionId VARCHAR(100), " +
-                     "analystId VARCHAR(100), " +
                      "status VARCHAR(50))"; // active / offline
         
-        // Thử thêm cột status nếu bảng đã tồn tại từ trước mà chưa có cột này
-        String alterSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
+        String addStatusSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
                           "AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'status') " +
                           "ALTER TABLE aita_records ADD status VARCHAR(50)";
+
+        String dropAnalystIdSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
+                                  "AND EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'analystId') " +
+                                  "ALTER TABLE aita_records DROP COLUMN analystId";
                           
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
-            stmt.execute(alterSql);
+            stmt.execute(addStatusSql);
+            stmt.execute(dropAnalystIdSql);
         } catch (SQLException e) {
             System.err.println("Không thể khởi tạo hoặc cập nhật bảng aita_records: " + e.getMessage());
         }
@@ -48,7 +50,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
 
     @Override
     public void insert(AitaRecord record) {
-        String sql = "INSERT INTO aita_records (userId, name, email, age, role, submissionId, analystId, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO aita_records (userId, name, email, age, role, submissionId, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -58,8 +60,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
             pstmt.setInt(4, record.getAge());
             pstmt.setString(5, record.getRole());
             pstmt.setString(6, record.getSubmissionId());
-            pstmt.setString(7, record.getAnalystId());
-            pstmt.setString(8, record.getStatus());
+            pstmt.setString(7, record.getStatus());
             pstmt.executeUpdate();
 
         } catch (SQLException e) {
@@ -84,7 +85,6 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                         rs.getInt("age"),
                         rs.getString("role"),
                         rs.getString("submissionId"),
-                        rs.getString("analystId"),
                         rs.getString("status")
                     );
                 }
@@ -112,7 +112,6 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                     rs.getInt("age"),
                     rs.getString("role"),
                     rs.getString("submissionId"),
-                    rs.getString("analystId"),
                     rs.getString("status")
                 ));
             }
@@ -124,7 +123,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
 
     @Override
     public void update(AitaRecord record) {
-        String sql = "UPDATE aita_records SET userId=?, name=?, email=?, age=?, role=?, submissionId=?, analystId=?, status=? WHERE dbId=?";
+        String sql = "UPDATE aita_records SET userId=?, name=?, email=?, age=?, role=?, submissionId=?, status=? WHERE dbId=?";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -134,9 +133,8 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
             pstmt.setInt(4, record.getAge());
             pstmt.setString(5, record.getRole());
             pstmt.setString(6, record.getSubmissionId());
-            pstmt.setString(7, record.getAnalystId());
-            pstmt.setString(8, record.getStatus());
-            pstmt.setInt(9, record.getDbId());
+            pstmt.setString(7, record.getStatus());
+            pstmt.setInt(8, record.getDbId());
             pstmt.executeUpdate();
 
         } catch (SQLException e) {
