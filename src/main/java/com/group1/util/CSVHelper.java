@@ -20,8 +20,15 @@ public class CSVHelper {
             br.readLine(); 
             while ((line = br.readLine()) != null) {
                 String[] data = line.split(cvsSplitBy, -1);
-                if(data.length >= 2) {
-                    accounts.add(new UserAccount(data[0].trim(), data[1].trim()));
+                if(data.length >= 6) {
+                    accounts.add(new UserAccount(
+                        data[0].trim(), // userId
+                        data[1].trim(), // username
+                        data[2].trim(), // email
+                        data[3].trim(), // role
+                        data[4].trim(), // status
+                        data[5].trim()  // password
+                    ));
                 }
             }
         } catch (IOException e) {

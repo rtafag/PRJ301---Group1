@@ -32,6 +32,15 @@ public class DataGenerator {
         String prefix = removeAccents(firstName + lastName) + rand.nextInt(1000);
         return prefix;
     }
+    
+    public static String generateRandomPassword(Random rand) {
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
+        StringBuilder sb = new StringBuilder(8);
+        for(int i = 0; i < 8; i++) {
+            sb.append(chars.charAt(rand.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
 
     public static void main(String[] args) {
         Random rand = new Random();
@@ -64,13 +73,17 @@ public class DataGenerator {
             for (int i = 1; i <= 100; i++) {
                 String userId = String.format("GV%06d", i);
                 teacherIds.add(userId);
-                userAccounts.add(userId + ",password123");
                 
                 String name = allNames.get(nameIdx++);
-                String email = generateEmailPrefix(name, rand) + "@fpt.edu.vn";
+                String prefix = generateEmailPrefix(name, rand);
+                String email = prefix + "@fpt.edu.vn";
+                String username = prefix;
+                String password = generateRandomPassword(rand);
                 int age = 30 + rand.nextInt(30);
                 String role = "Giảng viên";
                 String status = rand.nextBoolean() ? "active" : "offline";
+                
+                userAccounts.add(String.format("%s,%s,%s,%s,%s,%s", userId, username, email, role, status, password));
                 
                 // Random 1 to 3 courses
                 int numCourses = 1 + rand.nextInt(3);
@@ -98,14 +111,19 @@ public class DataGenerator {
             for (int i = 1; i <= 1000; i++) {
                 String userId = String.format("HE15%04d", i);
                 studentIds.add(userId);
-                userAccounts.add(userId + ",password123");
                 
                 String name = allNames.get(nameIdx++);
-                String email = generateEmailPrefix(name, rand) + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
+                String prefix = generateEmailPrefix(name, rand);
+                String email = prefix + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
+                String username = prefix;
+                String password = generateRandomPassword(rand);
+                
                 int age = 18 + rand.nextInt(7);
                 String role = "Sinh viên";
                 String status = rand.nextBoolean() ? "active" : "offline";
                 double gpa = Math.round((4.0 + rand.nextDouble() * 6.0) * 10.0) / 10.0;
+                
+                userAccounts.add(String.format("%s,%s,%s,%s,%s,%s", userId, username, email, role, status, password));
                 
                 // Random 3 to 5 courses
                 int numCourses = 3 + rand.nextInt(3);
@@ -126,7 +144,7 @@ public class DataGenerator {
         // 3. Users.csv
         Collections.shuffle(userAccounts);
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/users.csv", StandardCharsets.UTF_8))) {
-            bw.write("UserID,Password\n");
+            bw.write("UserID,Username,Email,Role,Status,Password\n");
             for (String acc : userAccounts) {
                 bw.write(acc + "\n");
             }
@@ -163,7 +181,6 @@ public class DataGenerator {
                     if (!eligibleTeachers.isEmpty()) {
                         teacherId = eligibleTeachers.get(rand.nextInt(eligibleTeachers.size()));
                     } else {
-                        // Fallback just in case, though highly unlikely with 100 teachers
                         teacherId = teacherIds.get(rand.nextInt(teacherIds.size())); 
                     }
                     
@@ -177,6 +194,6 @@ public class DataGenerator {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println("Data generated successfully with multiple courses (PRJ301, SWP391, etc)!");
+        System.out.println("Data generated successfully with full Users table (random passwords)!");
     }
 }
