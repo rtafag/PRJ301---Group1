@@ -1,18 +1,19 @@
 package com.group1.model;
 
 public class AitaRecord {
-    private int dbId; // Primary key in database
-    private String userId; // ID của name đó (VD: HE150000, GV123)
+    private int dbId;
+    private String userId; 
     private String name;
     private String email;
     private int age;
-    private String role; // Học sinh / Giáo viên
+    private String role; 
     private String submissionId;
     private String analystId;
+    private String status; // active or offline
 
     public AitaRecord() {}
 
-    public AitaRecord(String userId, String name, String email, int age, String role, String submissionId, String analystId) {
+    public AitaRecord(String userId, String name, String email, int age, String role, String submissionId, String analystId, String status) {
         this.userId = userId;
         this.name = name;
         this.email = email;
@@ -20,9 +21,10 @@ public class AitaRecord {
         this.role = role;
         this.submissionId = submissionId;
         this.analystId = analystId;
+        this.status = status;
     }
 
-    public AitaRecord(int dbId, String userId, String name, String email, int age, String role, String submissionId, String analystId) {
+    public AitaRecord(int dbId, String userId, String name, String email, int age, String role, String submissionId, String analystId, String status) {
         this.dbId = dbId;
         this.userId = userId;
         this.name = name;
@@ -31,6 +33,7 @@ public class AitaRecord {
         this.role = role;
         this.submissionId = submissionId;
         this.analystId = analystId;
+        this.status = status;
     }
 
     public int getDbId() { return dbId; }
@@ -49,11 +52,12 @@ public class AitaRecord {
     public void setSubmissionId(String submissionId) { this.submissionId = submissionId; }
     public String getAnalystId() { return analystId; }
     public void setAnalystId(String analystId) { this.analystId = analystId; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
     @Override
     public String toString() {
-        return "AitaRecord{dbId=" + dbId + ", userId='" + userId + "', name='" + name + 
-               "', role='" + role + "', submissionId='" + submissionId + 
-               "', analystId='" + analystId + "'}";
+        return "AitaRecord{userId='" + userId + "', name='" + name + 
+               "', role='" + role + "', status='" + status + "', submissionId='" + submissionId + "'}";
     }
 }
