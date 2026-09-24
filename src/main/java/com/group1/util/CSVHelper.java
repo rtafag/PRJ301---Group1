@@ -1,6 +1,6 @@
 package com.group1.util;
 
-import com.group1.model.Student;
+import com.group1.model.AitaRecord;
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
@@ -9,31 +9,33 @@ import java.util.List;
 
 public class CSVHelper {
 
-    // Đọc dữ liệu từ file CSV
-    public static List<Student> readStudentsFromCSV(String filePath) {
-        List<Student> students = new ArrayList<>();
+    public static List<AitaRecord> readRecordsFromCSV(String filePath) {
+        List<AitaRecord> records = new ArrayList<>();
         String line = "";
         String cvsSplitBy = ",";
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            // Đọc dòng Header đầu tiên (nếu có) và bỏ qua
-            br.readLine(); 
+            br.readLine(); // Bỏ qua Header
 
             while ((line = br.readLine()) != null) {
-                // Sử dụng dấu phẩy làm phân cách
-                String[] data = line.split(cvsSplitBy);
+                // Sử dụng dấu phẩy làm phân cách. Lưu ý: Cần xử lý nếu data có chứa dấu phẩy bên trong.
+                String[] data = line.split(cvsSplitBy, -1);
                 
-                if(data.length >= 3) {
-                    String name = data[0].trim();
-                    String email = data[1].trim();
-                    int age = Integer.parseInt(data[2].trim());
+                if(data.length >= 7) {
+                    String userId = data[0].trim();
+                    String name = data[1].trim();
+                    String email = data[2].trim();
+                    int age = data[3].trim().isEmpty() ? 0 : Integer.parseInt(data[3].trim());
+                    String role = data[4].trim();
+                    String submissionId = data[5].trim();
+                    String analystId = data[6].trim();
                     
-                    students.add(new Student(name, email, age));
+                    records.add(new AitaRecord(userId, name, email, age, role, submissionId, analystId));
                 }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        return students;
+        return records;
     }
 }
