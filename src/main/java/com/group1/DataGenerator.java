@@ -50,15 +50,15 @@ public class DataGenerator {
         
         int nameIdx = 0;
         
-        List<String> courseCodes = new ArrayList<>();
-        for(int i = 1; i <= 100; i++) {
-            courseCodes.add(String.format("PRJ%03d", i));
-        }
+        // 10 realistic courses
+        String[] COURSES = {"PRJ301", "SWP391", "CSD201", "MAS291", "PRO192", "MAE101", "CEA201", "JPD113", "JPE255", "NWC203"};
 
         List<String> userAccounts = new ArrayList<>();
 
-        // 1. Giang vien (100 rows) - Mỗi người 1 mã môn
+        // 1. Giang vien (100 rows) - Mỗi người 1-3 mã môn
         List<String> teacherIds = new ArrayList<>();
+        List<List<String>> teacherCoursesMap = new ArrayList<>(); // To store what each teacher teaches
+        
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/teachers.csv", StandardCharsets.UTF_8))) {
             bw.write("UserID,Name,Email,Age,Role,Status,CourseCode\n");
             for (int i = 1; i <= 100; i++) {
@@ -71,40 +71,53 @@ public class DataGenerator {
                 int age = 30 + rand.nextInt(30);
                 String role = "Giảng viên";
                 String status = rand.nextBoolean() ? "active" : "offline";
-                String course = courseCodes.get(i - 1);
                 
-                bw.write(String.format("%s,%s,%s,%d,%s,%s,%s\n", userId, name, email, age, role, status, course));
+                // Random 1 to 3 courses
+                int numCourses = 1 + rand.nextInt(3);
+                List<String> tCourses = new ArrayList<>();
+                while (tCourses.size() < numCourses) {
+                    String c = COURSES[rand.nextInt(COURSES.length)];
+                    if (!tCourses.contains(c)) tCourses.add(c);
+                }
+                teacherCoursesMap.add(tCourses);
+                String courseStr = String.join("|", tCourses);
+                
+                bw.write(String.format("%s,%s,%s,%d,%s,%s,%s\n", userId, name, email, age, role, status, courseStr));
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        // 2. Sinh vien (1000 rows) - Mỗi mã môn có 10 SV
+        // 2. Sinh vien (1000 rows) - Mỗi sinh viên 3-5 mã môn
         List<String> studentIds = new ArrayList<>();
-        List<String> studentTeacherMap = new ArrayList<>();
+        List<List<String>> studentCoursesMap = new ArrayList<>();
+        
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/students.csv", StandardCharsets.UTF_8))) {
             bw.write("UserID,Name,Email,Age,Role,Status,CourseCode,GPA\n");
             
-            int studentCount = 1;
-            for (int i = 0; i < 100; i++) {
-                String course = courseCodes.get(i);
-                String teacherIdForCourse = teacherIds.get(i); // Since 1-to-1 course-to-teacher mapping
+            for (int i = 1; i <= 1000; i++) {
+                String userId = String.format("HE15%04d", i);
+                studentIds.add(userId);
+                userAccounts.add(userId + ",password123");
                 
-                for (int j = 0; j < 10; j++) {
-                    String userId = String.format("HE15%04d", studentCount++);
-                    studentIds.add(userId);
-                    studentTeacherMap.add(teacherIdForCourse); // save for submission mapping
-                    userAccounts.add(userId + ",password123");
-                    
-                    String name = allNames.get(nameIdx++);
-                    String email = generateEmailPrefix(name, rand) + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
-                    int age = 18 + rand.nextInt(7);
-                    String role = "Sinh viên";
-                    String status = rand.nextBoolean() ? "active" : "offline";
-                    double gpa = Math.round((4.0 + rand.nextDouble() * 6.0) * 10.0) / 10.0; // 4.0 to 10.0
-                    
-                    bw.write(String.format("%s,%s,%s,%d,%s,%s,%s,%.1f\n", userId, name, email, age, role, status, course, gpa));
+                String name = allNames.get(nameIdx++);
+                String email = generateEmailPrefix(name, rand) + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
+                int age = 18 + rand.nextInt(7);
+                String role = "Sinh viên";
+                String status = rand.nextBoolean() ? "active" : "offline";
+                double gpa = Math.round((4.0 + rand.nextDouble() * 6.0) * 10.0) / 10.0;
+                
+                // Random 3 to 5 courses
+                int numCourses = 3 + rand.nextInt(3);
+                List<String> sCourses = new ArrayList<>();
+                while (sCourses.size() < numCourses) {
+                    String c = COURSES[rand.nextInt(COURSES.length)];
+                    if (!sCourses.contains(c)) sCourses.add(c);
                 }
+                studentCoursesMap.add(sCourses);
+                String courseStr = String.join("|", sCourses);
+                
+                bw.write(String.format("%s,%s,%s,%d,%s,%s,%s,%.1f\n", userId, name, email, age, role, status, courseStr, gpa));
             }
         } catch (IOException e) {
             e.printStackTrace();
@@ -121,21 +134,49 @@ public class DataGenerator {
             e.printStackTrace();
         }
 
-        // 4. Submissions (1000 rows)
+        // 4. Submissions (2000 rows - ~2 submissions per student)
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/submissions.csv", StandardCharsets.UTF_8))) {
             bw.write("SubmissionID,StudentID,TeacherID,SubmitTime,Score,ScorePublicTime\n");
-            for (int i = 0; i < 1000; i++) {
-                String subId = String.format("SUB%04d", i + 1);
+            int subIdCounter = 1;
+            
+            for (int i = 0; i < studentIds.size(); i++) {
                 String studentId = studentIds.get(i);
-                String teacherId = studentTeacherMap.get(i); // Assign correctly to the teacher of that course
-                String submitTime = "2023-10-20 10:00:00";
-                double score = Math.round(rand.nextDouble() * 100.0) / 10.0;
-                String scorePublicTime = "2023-10-21 15:00:00";
-                bw.write(String.format("%s,%s,%s,%s,%.1f,%s\n", subId, studentId, teacherId, submitTime, score, scorePublicTime));
+                List<String> sCourses = studentCoursesMap.get(i);
+                
+                // Generate 1 to 3 submissions for this student
+                int numSubmissions = 1 + rand.nextInt(3);
+                for (int s = 0; s < numSubmissions; s++) {
+                    String subId = String.format("SUB%04d", subIdCounter++);
+                    
+                    // Pick a random course the student is taking
+                    String chosenCourse = sCourses.get(rand.nextInt(sCourses.size()));
+                    
+                    // Find all teachers who teach this course
+                    List<String> eligibleTeachers = new ArrayList<>();
+                    for (int t = 0; t < teacherIds.size(); t++) {
+                        if (teacherCoursesMap.get(t).contains(chosenCourse)) {
+                            eligibleTeachers.add(teacherIds.get(t));
+                        }
+                    }
+                    
+                    String teacherId = "";
+                    if (!eligibleTeachers.isEmpty()) {
+                        teacherId = eligibleTeachers.get(rand.nextInt(eligibleTeachers.size()));
+                    } else {
+                        // Fallback just in case, though highly unlikely with 100 teachers
+                        teacherId = teacherIds.get(rand.nextInt(teacherIds.size())); 
+                    }
+                    
+                    String submitTime = "2023-10-20 10:00:00";
+                    double score = Math.round(rand.nextDouble() * 100.0) / 10.0;
+                    String scorePublicTime = "2023-10-21 15:00:00";
+                    
+                    bw.write(String.format("%s,%s,%s,%s,%.1f,%s\n", subId, studentId, teacherId, submitTime, score, scorePublicTime));
+                }
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println("Data generated successfully with realistic emails, course mappings, GPA and users.csv!");
+        System.out.println("Data generated successfully with multiple courses (PRJ301, SWP391, etc)!");
     }
 }
