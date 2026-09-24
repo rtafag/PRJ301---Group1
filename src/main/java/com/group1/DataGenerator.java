@@ -111,6 +111,7 @@ public class DataGenerator {
         }
         
         // 3. Users.csv
+        Collections.shuffle(userAccounts);
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/users.csv", StandardCharsets.UTF_8))) {
             bw.write("UserID,Password\n");
             for (String acc : userAccounts) {
