@@ -4,6 +4,7 @@ import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -15,6 +16,22 @@ public class DataGenerator {
     private static final String[] LAST_NAMES = {"Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ", "Võ", "Đặng", "Bùi", "Đỗ", "Hồ", "Ngô", "Dương", "Lý"};
     private static final String[] MIDDLE_NAMES = {"Văn", "Thị", "Hữu", "Ngọc", "Đức", "Minh", "Quang", "Xuân", "Thu", "Thanh", "Hoàng", "Gia", "Thành", "Đình", "Hải"};
     private static final String[] FIRST_NAMES = {"Anh", "Tuấn", "Dũng", "Hoa", "Lan", "Hương", "Huy", "Cường", "Trang", "Linh", "Phong", "Nga", "Sơn", "Tùng", "Bình", "Thảo", "Hà", "Vy", "Long", "Bách", "Khoa", "Nguyên", "Khánh"};
+
+    public static String removeAccents(String s) {
+        String normalized = Normalizer.normalize(s, Normalizer.Form.NFD);
+        return normalized.replaceAll("\\p{InCombiningDiacriticalMarks}+", "")
+                         .replaceAll("Đ", "D").replaceAll("đ", "d")
+                         .toLowerCase().replaceAll("\\s+", "");
+    }
+
+    public static String generateEmailPrefix(String fullName, Random rand) {
+        String[] parts = fullName.split(" ");
+        String firstName = parts[parts.length - 1];
+        String lastName = parts[0];
+        
+        String prefix = removeAccents(firstName + lastName) + rand.nextInt(1000);
+        return prefix;
+    }
 
     public static void main(String[] args) {
         Random rand = new Random();
@@ -41,7 +58,7 @@ public class DataGenerator {
                 String userId = String.format("HE15%04d", i);
                 studentIds.add(userId);
                 String name = allNames.get(nameIdx++);
-                String email = "sv" + i + "@fpt.edu.vn";
+                String email = generateEmailPrefix(name, rand) + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
                 int age = 18 + rand.nextInt(7);
                 String role = "Sinh viên";
                 String status = rand.nextBoolean() ? "active" : "offline";
@@ -59,7 +76,7 @@ public class DataGenerator {
                 String userId = String.format("GV%06d", i);
                 teacherIds.add(userId);
                 String name = allNames.get(nameIdx++);
-                String email = "gv" + i + "@fpt.edu.vn";
+                String email = generateEmailPrefix(name, rand) + "@fpt.edu.vn";
                 int age = 30 + rand.nextInt(30);
                 String role = "Giảng viên";
                 String status = rand.nextBoolean() ? "active" : "offline";
@@ -84,6 +101,6 @@ public class DataGenerator {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println("Data generated successfully with unique Vietnamese names!");
+        System.out.println("Data generated successfully with realistic emails!");
     }
 }
