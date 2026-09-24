@@ -4,8 +4,11 @@ import com.group1.dao.AitaRecordDAO;
 import com.group1.dao.AitaRecordDAOImpl;
 import com.group1.dao.SubmissionDAO;
 import com.group1.dao.SubmissionDAOImpl;
+import com.group1.dao.UserAccountDAO;
+import com.group1.dao.UserAccountDAOImpl;
 import com.group1.model.AitaRecord;
 import com.group1.model.Submission;
+import com.group1.model.UserAccount;
 import com.group1.util.CSVHelper;
 
 import java.util.List;
@@ -13,32 +16,42 @@ import java.util.Optional;
 
 public class Main {
     public static void main(String[] args) {
-        System.out.println("=== KẾT NỐI TỚI AITA_DB & NHẬP DỮ LIỆU TỪ 3 FILE CSV ===");
+        System.out.println("=== KẾT NỐI TỚI AITA_DB & NHẬP DỮ LIỆU TỪ 4 FILE CSV ===");
         
-        AitaRecordDAO userDAO = new AitaRecordDAOImpl();
+        AitaRecordDAO aitaDAO = new AitaRecordDAOImpl();
         SubmissionDAO submissionDAO = new SubmissionDAOImpl();
+        UserAccountDAO userAccountDAO = new UserAccountDAOImpl();
         
+        String usersFile = "data/users.csv";
         String studentsFile = "data/students.csv";
         String teachersFile = "data/teachers.csv";
         String submissionsFile = "data/submissions.csv";
         
-        // --- 1. NHẬP DỮ LIỆU SINH VIÊN ---
+        // --- 1. NHẬP DỮ LIỆU USERS ---
+        System.out.println("\n--- Đang đọc dữ liệu Tài khoản từ: " + usersFile + " ---");
+        List<UserAccount> accounts = CSVHelper.readUsersFromCSV(usersFile);
+        for (UserAccount acc : accounts) {
+            userAccountDAO.insert(acc);
+            System.out.println(" -> Đã thêm Tài khoản: " + acc.getUserId());
+        }
+
+        // --- 2. NHẬP DỮ LIỆU SINH VIÊN ---
         System.out.println("\n--- Đang đọc dữ liệu Sinh viên từ: " + studentsFile + " ---");
-        List<AitaRecord> students = CSVHelper.readUsersFromCSV(studentsFile);
+        List<AitaRecord> students = CSVHelper.readStudentsFromCSV(studentsFile);
         for (AitaRecord r : students) {
-            userDAO.insert(r);
-            System.out.println(" -> Đã thêm Sinh viên: [" + r.getStatus() + "] " + r.getName());
+            aitaDAO.insert(r);
+            System.out.println(" -> Đã thêm Sinh viên: " + r.getName() + " - Môn: " + r.getCourseCode() + " - GPA: " + r.getGpa());
         }
 
-        // --- 2. NHẬP DỮ LIỆU GIẢNG VIÊN ---
+        // --- 3. NHẬP DỮ LIỆU GIẢNG VIÊN ---
         System.out.println("\n--- Đang đọc dữ liệu Giảng viên từ: " + teachersFile + " ---");
-        List<AitaRecord> teachers = CSVHelper.readUsersFromCSV(teachersFile);
+        List<AitaRecord> teachers = CSVHelper.readTeachersFromCSV(teachersFile);
         for (AitaRecord r : teachers) {
-            userDAO.insert(r);
-            System.out.println(" -> Đã thêm Giảng viên: [" + r.getStatus() + "] " + r.getName());
+            aitaDAO.insert(r);
+            System.out.println(" -> Đã thêm Giảng viên: " + r.getName() + " - Dạy môn: " + r.getCourseCode());
         }
 
-        // --- 3. NHẬP DỮ LIỆU SUBMISSION ---
+        // --- 4. NHẬP DỮ LIỆU SUBMISSION ---
         System.out.println("\n--- Đang đọc dữ liệu Bài nộp từ: " + submissionsFile + " ---");
         List<Submission> submissions = CSVHelper.readSubmissionsFromCSV(submissionsFile);
         for (Submission s : submissions) {
@@ -46,43 +59,6 @@ public class Main {
             System.out.println(" -> Đã thêm Submission: " + s.getSubmissionId() + " (Điểm: " + s.getScore() + ")");
         }
         
-        // --- 4. KIỂM THỬ: GIẢNG VIÊN CHẤM VÀ SỬA ĐIỂM ---
-        System.out.println("\n--- KIỂM THỬ QUYỀN GIẢNG VIÊN CHẤM ĐIỂM ---");
-        String graderId = "GV000001";
-        String targetSubmissionId = "SUB0001";
-        double newScore = 10.0;
-        String newPublicTime = "2023-10-22 08:00:00";
-        
-        List<AitaRecord> allUsersForCheck = userDAO.getAll();
-        Optional<AitaRecord> graderOpt = allUsersForCheck.stream()
-                .filter(u -> u.getUserId().equals(graderId))
-                .findFirst();
-                
-        if (graderOpt.isPresent()) {
-            AitaRecord grader = graderOpt.get();
-            if ("Giảng viên".equalsIgnoreCase(grader.getRole())) {
-                System.out.println("[Cho phép] Tài khoản " + grader.getName() + " (" + grader.getRole() + ") có quyền chấm điểm.");
-                submissionDAO.updateScore(targetSubmissionId, newScore, newPublicTime);
-                System.out.println(" -> Đã cập nhật điểm bài nộp " + targetSubmissionId + " thành " + newScore);
-            } else {
-                System.out.println("[Từ chối] Tài khoản " + grader.getName() + " không có quyền Giảng viên!");
-            }
-        } else {
-            System.out.println("[Lỗi] Không tìm thấy tài khoản " + graderId);
-        }
-
-        // --- 5. HIỂN THỊ KẾT QUẢ TỪ DATABASE ---
-        System.out.println("\n=== KẾT QUẢ TỪ SQL SERVER ===");
-        System.out.println("--- Bảng aita_records (Sinh viên & Giảng viên) ---");
-        List<AitaRecord> allUsers = userDAO.getAll();
-        for (AitaRecord r : allUsers) {
-            System.out.println(r);
-        }
-
-        System.out.println("\n--- Bảng submissions (Bài nộp) ---");
-        List<Submission> allSubmissions = submissionDAO.getAll();
-        for (Submission s : allSubmissions) {
-            System.out.println(s);
-        }
+        System.out.println("\n=== HOÀN TẤT NẠP DỮ LIỆU ===");
     }
 }

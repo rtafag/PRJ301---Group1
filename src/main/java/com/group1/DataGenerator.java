@@ -49,50 +49,84 @@ public class DataGenerator {
         Collections.shuffle(allNames);
         
         int nameIdx = 0;
-
-        // 1. Sinh vien (1000 rows)
-        List<String> studentIds = new ArrayList<>();
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/students.csv", StandardCharsets.UTF_8))) {
-            bw.write("UserID,Name,Email,Age,Role,Status\n");
-            for (int i = 1; i <= 1000; i++) {
-                String userId = String.format("HE15%04d", i);
-                studentIds.add(userId);
-                String name = allNames.get(nameIdx++);
-                String email = generateEmailPrefix(name, rand) + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
-                int age = 18 + rand.nextInt(7);
-                String role = "Sinh viên";
-                String status = rand.nextBoolean() ? "active" : "offline";
-                bw.write(String.format("%s,%s,%s,%d,%s,%s\n", userId, name, email, age, role, status));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+        
+        List<String> courseCodes = new ArrayList<>();
+        for(int i = 1; i <= 100; i++) {
+            courseCodes.add(String.format("PRJ%03d", i));
         }
 
-        // 2. Giang vien (100 rows)
+        List<String> userAccounts = new ArrayList<>();
+
+        // 1. Giang vien (100 rows) - Mỗi người 1 mã môn
         List<String> teacherIds = new ArrayList<>();
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/teachers.csv", StandardCharsets.UTF_8))) {
-            bw.write("UserID,Name,Email,Age,Role,Status\n");
+            bw.write("UserID,Name,Email,Age,Role,Status,CourseCode\n");
             for (int i = 1; i <= 100; i++) {
                 String userId = String.format("GV%06d", i);
                 teacherIds.add(userId);
+                userAccounts.add(userId + ",password123");
+                
                 String name = allNames.get(nameIdx++);
                 String email = generateEmailPrefix(name, rand) + "@fpt.edu.vn";
                 int age = 30 + rand.nextInt(30);
                 String role = "Giảng viên";
                 String status = rand.nextBoolean() ? "active" : "offline";
-                bw.write(String.format("%s,%s,%s,%d,%s,%s\n", userId, name, email, age, role, status));
+                String course = courseCodes.get(i - 1);
+                
+                bw.write(String.format("%s,%s,%s,%d,%s,%s,%s\n", userId, name, email, age, role, status, course));
             }
         } catch (IOException e) {
             e.printStackTrace();
         }
 
-        // 3. Submissions (1000 rows)
+        // 2. Sinh vien (1000 rows) - Mỗi mã môn có 10 SV
+        List<String> studentIds = new ArrayList<>();
+        List<String> studentTeacherMap = new ArrayList<>();
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/students.csv", StandardCharsets.UTF_8))) {
+            bw.write("UserID,Name,Email,Age,Role,Status,CourseCode,GPA\n");
+            
+            int studentCount = 1;
+            for (int i = 0; i < 100; i++) {
+                String course = courseCodes.get(i);
+                String teacherIdForCourse = teacherIds.get(i); // Since 1-to-1 course-to-teacher mapping
+                
+                for (int j = 0; j < 10; j++) {
+                    String userId = String.format("HE15%04d", studentCount++);
+                    studentIds.add(userId);
+                    studentTeacherMap.add(teacherIdForCourse); // save for submission mapping
+                    userAccounts.add(userId + ",password123");
+                    
+                    String name = allNames.get(nameIdx++);
+                    String email = generateEmailPrefix(name, rand) + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
+                    int age = 18 + rand.nextInt(7);
+                    String role = "Sinh viên";
+                    String status = rand.nextBoolean() ? "active" : "offline";
+                    double gpa = Math.round((4.0 + rand.nextDouble() * 6.0) * 10.0) / 10.0; // 4.0 to 10.0
+                    
+                    bw.write(String.format("%s,%s,%s,%d,%s,%s,%s,%.1f\n", userId, name, email, age, role, status, course, gpa));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        
+        // 3. Users.csv
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/users.csv", StandardCharsets.UTF_8))) {
+            bw.write("UserID,Password\n");
+            for (String acc : userAccounts) {
+                bw.write(acc + "\n");
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+        // 4. Submissions (1000 rows)
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/submissions.csv", StandardCharsets.UTF_8))) {
             bw.write("SubmissionID,StudentID,TeacherID,SubmitTime,Score,ScorePublicTime\n");
-            for (int i = 1; i <= 1000; i++) {
-                String subId = String.format("SUB%04d", i);
-                String studentId = studentIds.get(i-1);
-                String teacherId = teacherIds.get(rand.nextInt(teacherIds.size()));
+            for (int i = 0; i < 1000; i++) {
+                String subId = String.format("SUB%04d", i + 1);
+                String studentId = studentIds.get(i);
+                String teacherId = studentTeacherMap.get(i); // Assign correctly to the teacher of that course
                 String submitTime = "2023-10-20 10:00:00";
                 double score = Math.round(rand.nextDouble() * 100.0) / 10.0;
                 String scorePublicTime = "2023-10-21 15:00:00";
@@ -101,6 +135,6 @@ public class DataGenerator {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println("Data generated successfully with realistic emails!");
+        System.out.println("Data generated successfully with realistic emails, course mappings, GPA and users.csv!");
     }
 }

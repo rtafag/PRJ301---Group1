@@ -27,26 +27,23 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                      "email VARCHAR(100), " +
                      "age INT, " +
                      "role NVARCHAR(50), " +
-                     "status VARCHAR(50))"; // active / offline
+                     "status VARCHAR(50), " +
+                     "courseCode VARCHAR(50), " +
+                     "gpa FLOAT)"; 
         
-        String addStatusSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
-                          "AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'status') " +
-                          "ALTER TABLE aita_records ADD status VARCHAR(50)";
+        String addCourseCodeSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
+                                  "AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'courseCode') " +
+                                  "ALTER TABLE aita_records ADD courseCode VARCHAR(50)";
 
-        String dropAnalystIdSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
-                                  "AND EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'analystId') " +
-                                  "ALTER TABLE aita_records DROP COLUMN analystId";
-
-        String dropSubmissionIdSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
-                                     "AND EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'submissionId') " +
-                                     "ALTER TABLE aita_records DROP COLUMN submissionId";
+        String addGpaSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
+                           "AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'gpa') " +
+                           "ALTER TABLE aita_records ADD gpa FLOAT";
                           
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
-            stmt.execute(addStatusSql);
-            stmt.execute(dropAnalystIdSql);
-            stmt.execute(dropSubmissionIdSql);
+            stmt.execute(addCourseCodeSql);
+            stmt.execute(addGpaSql);
         } catch (SQLException e) {
             System.err.println("Không thể khởi tạo hoặc cập nhật bảng aita_records: " + e.getMessage());
         }
@@ -54,7 +51,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
 
     @Override
     public void insert(AitaRecord record) {
-        String sql = "INSERT INTO aita_records (userId, name, email, age, role, status) VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO aita_records (userId, name, email, age, role, status, courseCode, gpa) VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -64,6 +61,8 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
             pstmt.setInt(4, record.getAge());
             pstmt.setString(5, record.getRole());
             pstmt.setString(6, record.getStatus());
+            pstmt.setString(7, record.getCourseCode());
+            pstmt.setDouble(8, record.getGpa());
             pstmt.executeUpdate();
 
         } catch (SQLException e) {
@@ -87,7 +86,9 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                         rs.getString("email"),
                         rs.getInt("age"),
                         rs.getString("role"),
-                        rs.getString("status")
+                        rs.getString("status"),
+                        rs.getString("courseCode"),
+                        rs.getDouble("gpa")
                     );
                 }
             }
@@ -113,7 +114,9 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                     rs.getString("email"),
                     rs.getInt("age"),
                     rs.getString("role"),
-                    rs.getString("status")
+                    rs.getString("status"),
+                    rs.getString("courseCode"),
+                    rs.getDouble("gpa")
                 ));
             }
         } catch (SQLException e) {
@@ -124,7 +127,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
 
     @Override
     public void update(AitaRecord record) {
-        String sql = "UPDATE aita_records SET userId=?, name=?, email=?, age=?, role=?, status=? WHERE dbId=?";
+        String sql = "UPDATE aita_records SET userId=?, name=?, email=?, age=?, role=?, status=?, courseCode=?, gpa=? WHERE dbId=?";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -134,7 +137,9 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
             pstmt.setInt(4, record.getAge());
             pstmt.setString(5, record.getRole());
             pstmt.setString(6, record.getStatus());
-            pstmt.setInt(7, record.getDbId());
+            pstmt.setString(7, record.getCourseCode());
+            pstmt.setDouble(8, record.getGpa());
+            pstmt.setInt(9, record.getDbId());
             pstmt.executeUpdate();
 
         } catch (SQLException e) {
@@ -147,10 +152,8 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
         String sql = "DELETE FROM aita_records WHERE dbId=?";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
-
             pstmt.setInt(1, dbId);
             pstmt.executeUpdate();
-
         } catch (SQLException e) {
             e.printStackTrace();
         }
