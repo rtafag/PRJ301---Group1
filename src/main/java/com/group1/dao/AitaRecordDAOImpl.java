@@ -27,7 +27,6 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                      "email VARCHAR(100), " +
                      "age INT, " +
                      "role NVARCHAR(50), " +
-                     "submissionId VARCHAR(100), " +
                      "status VARCHAR(50))"; // active / offline
         
         String addStatusSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
@@ -37,12 +36,17 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
         String dropAnalystIdSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
                                   "AND EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'analystId') " +
                                   "ALTER TABLE aita_records DROP COLUMN analystId";
+
+        String dropSubmissionIdSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='aita_records' and xtype='U') " +
+                                     "AND EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('aita_records') AND name = 'submissionId') " +
+                                     "ALTER TABLE aita_records DROP COLUMN submissionId";
                           
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
             stmt.execute(addStatusSql);
             stmt.execute(dropAnalystIdSql);
+            stmt.execute(dropSubmissionIdSql);
         } catch (SQLException e) {
             System.err.println("Không thể khởi tạo hoặc cập nhật bảng aita_records: " + e.getMessage());
         }
@@ -50,7 +54,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
 
     @Override
     public void insert(AitaRecord record) {
-        String sql = "INSERT INTO aita_records (userId, name, email, age, role, submissionId, status) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO aita_records (userId, name, email, age, role, status) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -59,8 +63,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
             pstmt.setString(3, record.getEmail());
             pstmt.setInt(4, record.getAge());
             pstmt.setString(5, record.getRole());
-            pstmt.setString(6, record.getSubmissionId());
-            pstmt.setString(7, record.getStatus());
+            pstmt.setString(6, record.getStatus());
             pstmt.executeUpdate();
 
         } catch (SQLException e) {
@@ -84,7 +87,6 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                         rs.getString("email"),
                         rs.getInt("age"),
                         rs.getString("role"),
-                        rs.getString("submissionId"),
                         rs.getString("status")
                     );
                 }
@@ -111,7 +113,6 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
                     rs.getString("email"),
                     rs.getInt("age"),
                     rs.getString("role"),
-                    rs.getString("submissionId"),
                     rs.getString("status")
                 ));
             }
@@ -123,7 +124,7 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
 
     @Override
     public void update(AitaRecord record) {
-        String sql = "UPDATE aita_records SET userId=?, name=?, email=?, age=?, role=?, submissionId=?, status=? WHERE dbId=?";
+        String sql = "UPDATE aita_records SET userId=?, name=?, email=?, age=?, role=?, status=? WHERE dbId=?";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
@@ -132,9 +133,8 @@ public class AitaRecordDAOImpl implements AitaRecordDAO {
             pstmt.setString(3, record.getEmail());
             pstmt.setInt(4, record.getAge());
             pstmt.setString(5, record.getRole());
-            pstmt.setString(6, record.getSubmissionId());
-            pstmt.setString(7, record.getStatus());
-            pstmt.setInt(8, record.getDbId());
+            pstmt.setString(6, record.getStatus());
+            pstmt.setInt(7, record.getDbId());
             pstmt.executeUpdate();
 
         } catch (SQLException e) {

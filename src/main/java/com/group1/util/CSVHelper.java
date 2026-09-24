@@ -10,38 +10,8 @@ import java.util.List;
 
 public class CSVHelper {
 
-    // Dành cho Sinh viên (có SubmissionID)
-    public static List<AitaRecord> readStudentsFromCSV(String filePath) {
-        List<AitaRecord> records = new ArrayList<>();
-        String line = "";
-        String cvsSplitBy = ",";
-
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            br.readLine(); // Bỏ qua Header
-
-            while ((line = br.readLine()) != null) {
-                String[] data = line.split(cvsSplitBy, -1);
-                
-                if(data.length >= 7) {
-                    String userId = data[0].trim();
-                    String name = data[1].trim();
-                    String email = data[2].trim();
-                    int age = data[3].trim().isEmpty() ? 0 : Integer.parseInt(data[3].trim());
-                    String role = data[4].trim();
-                    String submissionId = data[5].trim();
-                    String status = data[6].trim(); 
-                    
-                    records.add(new AitaRecord(userId, name, email, age, role, submissionId, status));
-                }
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return records;
-    }
-
-    // Dành cho Giảng viên (Không có SubmissionID)
-    public static List<AitaRecord> readTeachersFromCSV(String filePath) {
+    // Dành cho cả Sinh viên và Giảng viên
+    public static List<AitaRecord> readUsersFromCSV(String filePath) {
         List<AitaRecord> records = new ArrayList<>();
         String line = "";
         String cvsSplitBy = ",";
@@ -60,8 +30,7 @@ public class CSVHelper {
                     String role = data[4].trim();
                     String status = data[5].trim(); 
                     
-                    // Với giáo viên, submissionId để null hoặc rỗng
-                    records.add(new AitaRecord(userId, name, email, age, role, null, status));
+                    records.add(new AitaRecord(userId, name, email, age, role, status));
                 }
             }
         } catch (IOException e) {
@@ -81,13 +50,15 @@ public class CSVHelper {
             while ((line = br.readLine()) != null) {
                 String[] data = line.split(cvsSplitBy, -1);
                 
-                if(data.length >= 4) {
+                if(data.length >= 6) {
                     String submissionId = data[0].trim();
-                    String submitTime = data[1].trim();
-                    double score = data[2].trim().isEmpty() ? 0.0 : Double.parseDouble(data[2].trim());
-                    String scorePublicTime = data[3].trim();
+                    String studentId = data[1].trim();
+                    String teacherId = data[2].trim();
+                    String submitTime = data[3].trim();
+                    double score = data[4].trim().isEmpty() ? 0.0 : Double.parseDouble(data[4].trim());
+                    String scorePublicTime = data[5].trim();
                     
-                    submissions.add(new Submission(submissionId, submitTime, score, scorePublicTime));
+                    submissions.add(new Submission(submissionId, studentId, teacherId, submitTime, score, scorePublicTime));
                 }
             }
         } catch (IOException e) {

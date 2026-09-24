@@ -22,12 +22,25 @@ public class SubmissionDAOImpl implements SubmissionDAO {
         String sql = "IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='submissions' and xtype='U') " +
                      "CREATE TABLE submissions (" +
                      "submissionId VARCHAR(100) PRIMARY KEY, " +
+                     "studentId VARCHAR(50), " +
+                     "teacherId VARCHAR(50), " +
                      "submitTime VARCHAR(100), " +
                      "score FLOAT, " +
                      "scorePublicTime VARCHAR(100))";
+
+        String addStudentIdSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='submissions' and xtype='U') " +
+                                 "AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('submissions') AND name = 'studentId') " +
+                                 "ALTER TABLE submissions ADD studentId VARCHAR(50)";
+        
+        String addTeacherIdSql = "IF EXISTS (SELECT * FROM sysobjects WHERE name='submissions' and xtype='U') " +
+                                 "AND NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('submissions') AND name = 'teacherId') " +
+                                 "ALTER TABLE submissions ADD teacherId VARCHAR(50)";
+                                 
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(sql);
+            stmt.execute(addStudentIdSql);
+            stmt.execute(addTeacherIdSql);
         } catch (SQLException e) {
             System.err.println("Không thể tạo bảng submissions: " + e.getMessage());
         }
@@ -35,14 +48,16 @@ public class SubmissionDAOImpl implements SubmissionDAO {
 
     @Override
     public void insert(Submission submission) {
-        String sql = "INSERT INTO submissions (submissionId, submitTime, score, scorePublicTime) VALUES (?, ?, ?, ?)";
+        String sql = "INSERT INTO submissions (submissionId, studentId, teacherId, submitTime, score, scorePublicTime) VALUES (?, ?, ?, ?, ?, ?)";
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
 
             pstmt.setString(1, submission.getSubmissionId());
-            pstmt.setString(2, submission.getSubmitTime());
-            pstmt.setDouble(3, submission.getScore());
-            pstmt.setString(4, submission.getScorePublicTime());
+            pstmt.setString(2, submission.getStudentId());
+            pstmt.setString(3, submission.getTeacherId());
+            pstmt.setString(4, submission.getSubmitTime());
+            pstmt.setDouble(5, submission.getScore());
+            pstmt.setString(6, submission.getScorePublicTime());
             pstmt.executeUpdate();
 
         } catch (SQLException e) {
@@ -61,6 +76,8 @@ public class SubmissionDAOImpl implements SubmissionDAO {
                 if (rs.next()) {
                     return new Submission(
                         rs.getString("submissionId"),
+                        rs.getString("studentId"),
+                        rs.getString("teacherId"),
                         rs.getString("submitTime"),
                         rs.getDouble("score"),
                         rs.getString("scorePublicTime")
@@ -84,6 +101,8 @@ public class SubmissionDAOImpl implements SubmissionDAO {
             while (rs.next()) {
                 list.add(new Submission(
                     rs.getString("submissionId"),
+                    rs.getString("studentId"),
+                    rs.getString("teacherId"),
                     rs.getString("submitTime"),
                     rs.getDouble("score"),
                     rs.getString("scorePublicTime")

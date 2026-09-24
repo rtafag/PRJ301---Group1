@@ -24,7 +24,7 @@ public class Main {
         
         // --- 1. NHẬP DỮ LIỆU SINH VIÊN ---
         System.out.println("\n--- Đang đọc dữ liệu Sinh viên từ: " + studentsFile + " ---");
-        List<AitaRecord> students = CSVHelper.readStudentsFromCSV(studentsFile);
+        List<AitaRecord> students = CSVHelper.readUsersFromCSV(studentsFile);
         for (AitaRecord r : students) {
             userDAO.insert(r);
             System.out.println(" -> Đã thêm Sinh viên: [" + r.getStatus() + "] " + r.getName());
@@ -32,7 +32,7 @@ public class Main {
 
         // --- 2. NHẬP DỮ LIỆU GIẢNG VIÊN ---
         System.out.println("\n--- Đang đọc dữ liệu Giảng viên từ: " + teachersFile + " ---");
-        List<AitaRecord> teachers = CSVHelper.readTeachersFromCSV(teachersFile);
+        List<AitaRecord> teachers = CSVHelper.readUsersFromCSV(teachersFile);
         for (AitaRecord r : teachers) {
             userDAO.insert(r);
             System.out.println(" -> Đã thêm Giảng viên: [" + r.getStatus() + "] " + r.getName());
@@ -48,13 +48,11 @@ public class Main {
         
         // --- 4. KIỂM THỬ: GIẢNG VIÊN CHẤM VÀ SỬA ĐIỂM ---
         System.out.println("\n--- KIỂM THỬ QUYỀN GIẢNG VIÊN CHẤM ĐIỂM ---");
-        // Giả sử có một Giảng viên GV001234 muốn sửa điểm bài SUB001
-        String graderId = "GV001234";
-        String targetSubmissionId = "SUB001";
+        String graderId = "GV000001";
+        String targetSubmissionId = "SUB0001";
         double newScore = 10.0;
         String newPublicTime = "2023-10-22 08:00:00";
         
-        // Kiểm tra xem graderId có phải là Giảng viên không?
         List<AitaRecord> allUsersForCheck = userDAO.getAll();
         Optional<AitaRecord> graderOpt = allUsersForCheck.stream()
                 .filter(u -> u.getUserId().equals(graderId))
