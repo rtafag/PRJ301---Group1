@@ -10,7 +10,8 @@ import java.util.List;
 
 public class CSVHelper {
 
-    public static List<AitaRecord> readUsersFromCSV(String filePath) {
+    // Dành cho Sinh viên (có SubmissionID)
+    public static List<AitaRecord> readStudentsFromCSV(String filePath) {
         List<AitaRecord> records = new ArrayList<>();
         String line = "";
         String cvsSplitBy = ",";
@@ -28,9 +29,39 @@ public class CSVHelper {
                     int age = data[3].trim().isEmpty() ? 0 : Integer.parseInt(data[3].trim());
                     String role = data[4].trim();
                     String submissionId = data[5].trim();
-                    String status = data[6].trim(); // active or offline
+                    String status = data[6].trim(); 
                     
                     records.add(new AitaRecord(userId, name, email, age, role, submissionId, status));
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return records;
+    }
+
+    // Dành cho Giảng viên (Không có SubmissionID)
+    public static List<AitaRecord> readTeachersFromCSV(String filePath) {
+        List<AitaRecord> records = new ArrayList<>();
+        String line = "";
+        String cvsSplitBy = ",";
+
+        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+            br.readLine(); // Bỏ qua Header
+
+            while ((line = br.readLine()) != null) {
+                String[] data = line.split(cvsSplitBy, -1);
+                
+                if(data.length >= 6) {
+                    String userId = data[0].trim();
+                    String name = data[1].trim();
+                    String email = data[2].trim();
+                    int age = data[3].trim().isEmpty() ? 0 : Integer.parseInt(data[3].trim());
+                    String role = data[4].trim();
+                    String status = data[5].trim(); 
+                    
+                    // Với giáo viên, submissionId để null hoặc rỗng
+                    records.add(new AitaRecord(userId, name, email, age, role, null, status));
                 }
             }
         } catch (IOException e) {

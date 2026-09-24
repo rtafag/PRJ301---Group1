@@ -24,7 +24,7 @@ public class Main {
         
         // --- 1. NHẬP DỮ LIỆU SINH VIÊN ---
         System.out.println("\n--- Đang đọc dữ liệu Sinh viên từ: " + studentsFile + " ---");
-        List<AitaRecord> students = CSVHelper.readUsersFromCSV(studentsFile);
+        List<AitaRecord> students = CSVHelper.readStudentsFromCSV(studentsFile);
         for (AitaRecord r : students) {
             userDAO.insert(r);
             System.out.println(" -> Đã thêm Sinh viên: [" + r.getStatus() + "] " + r.getName());
@@ -32,7 +32,7 @@ public class Main {
 
         // --- 2. NHẬP DỮ LIỆU GIẢNG VIÊN ---
         System.out.println("\n--- Đang đọc dữ liệu Giảng viên từ: " + teachersFile + " ---");
-        List<AitaRecord> teachers = CSVHelper.readUsersFromCSV(teachersFile);
+        List<AitaRecord> teachers = CSVHelper.readTeachersFromCSV(teachersFile);
         for (AitaRecord r : teachers) {
             userDAO.insert(r);
             System.out.println(" -> Đã thêm Giảng viên: [" + r.getStatus() + "] " + r.getName());
