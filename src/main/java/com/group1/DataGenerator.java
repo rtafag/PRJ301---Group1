@@ -13,9 +13,9 @@ import java.util.Random;
 import java.util.Set;
 
 public class DataGenerator {
-    private static final String[] LAST_NAMES = {"Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ", "Võ", "Đặng", "Bùi", "Đỗ", "Hồ", "Ngô", "Dương", "Lý"};
-    private static final String[] MIDDLE_NAMES = {"Văn", "Thị", "Hữu", "Ngọc", "Đức", "Minh", "Quang", "Xuân", "Thu", "Thanh", "Hoàng", "Gia", "Thành", "Đình", "Hải"};
-    private static final String[] FIRST_NAMES = {"Anh", "Tuấn", "Dũng", "Hoa", "Lan", "Hương", "Huy", "Cường", "Trang", "Linh", "Phong", "Nga", "Sơn", "Tùng", "Bình", "Thảo", "Hà", "Vy", "Long", "Bách", "Khoa", "Nguyên", "Khánh"};
+    private static final String[] LAST_NAMES = {"Nguyễn", "Trần", "Lê", "Phạm", "Hoàng", "Huỳnh", "Phan", "Vũ", "Võ", "Đặng", "Bùi", "Đỗ"};
+    private static final String[] MIDDLE_NAMES = {"Văn", "Thị", "Hữu", "Ngọc", "Đức", "Minh", "Quang", "Xuân", "Thu", "Thanh"};
+    private static final String[] FIRST_NAMES = {"Anh", "Tuấn", "Dũng", "Hoa", "Lan", "Hương", "Huy", "Cường", "Trang", "Linh"};
 
     public static String removeAccents(String s) {
         String normalized = Normalizer.normalize(s, Normalizer.Form.NFD);
@@ -24,197 +24,72 @@ public class DataGenerator {
                          .toLowerCase().replaceAll("\\s+", "");
     }
 
-    public static String generateEmailPrefix(String fullName, Random rand) {
-        String[] parts = fullName.split(" ");
-        String firstName = parts[parts.length - 1];
-        String lastName = parts[0];
-        
-        String prefix = removeAccents(firstName + lastName) + rand.nextInt(1000);
-        return prefix;
-    }
-    
-    public static String generateRandomPassword(Random rand) {
-        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%";
-        StringBuilder sb = new StringBuilder(8);
-        for(int i = 0; i < 8; i++) {
-            sb.append(chars.charAt(rand.nextInt(chars.length())));
-        }
-        return sb.toString();
-    }
-
     public static void main(String[] args) {
         Random rand = new Random();
         Set<String> usedNames = new HashSet<>();
-        
         List<String> allNames = new ArrayList<>();
-        while(allNames.size() < 1100) {
+        while(allNames.size() < 100) {
             String name = LAST_NAMES[rand.nextInt(LAST_NAMES.length)] + " " + 
                           MIDDLE_NAMES[rand.nextInt(MIDDLE_NAMES.length)] + " " + 
                           FIRST_NAMES[rand.nextInt(FIRST_NAMES.length)];
-            if(usedNames.add(name)) {
-                allNames.add(name);
-            }
-        }
-        Collections.shuffle(allNames);
-        
-        int nameIdx = 0;
-        
-        // 10 realistic courses
-        String[] COURSES = {"PRJ301", "SWP391", "CSD201", "MAS291", "PRO192", "MAE101", "CEA201", "JPD113", "JPE255", "NWC203"};
-
-        List<String> userAccounts = new ArrayList<>();
-
-        // 1. Giang vien (100 rows) - Mỗi người 1-3 mã môn
-        List<String> teacherIds = new ArrayList<>();
-        List<List<String>> teacherCoursesMap = new ArrayList<>(); // To store what each teacher teaches
-        
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/teachers.csv", StandardCharsets.UTF_8))) {
-            bw.write("UserID,Name,Email,Age,Role,Status,CourseCode\n");
-            for (int i = 1; i <= 100; i++) {
-                String userId = String.format("GV%06d", i);
-                teacherIds.add(userId);
-                
-                String name = allNames.get(nameIdx++);
-                String prefix = generateEmailPrefix(name, rand);
-                String email = prefix + "@fpt.edu.vn";
-                String username = prefix;
-                String password = generateRandomPassword(rand);
-                int age = 30 + rand.nextInt(30);
-                String role = "Giảng viên";
-                String status = rand.nextBoolean() ? "active" : "offline";
-                
-                userAccounts.add(String.format("%s,%s,%s,%s,%s,%s", userId, username, email, role, status, password));
-                
-                // Random 1 to 3 courses
-                int numCourses = 1 + rand.nextInt(3);
-                List<String> tCourses = new ArrayList<>();
-                while (tCourses.size() < numCourses) {
-                    String c = COURSES[rand.nextInt(COURSES.length)];
-                    if (!tCourses.contains(c)) tCourses.add(c);
-                }
-                teacherCoursesMap.add(tCourses);
-                String courseStr = String.join("|", tCourses);
-                
-                bw.write(String.format("%s,%s,%s,%d,%s,%s,%s\n", userId, name, email, age, role, status, courseStr));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
-        // 2. Sinh vien (1000 rows) - Mỗi sinh viên 3-5 mã môn
-        List<String> studentIds = new ArrayList<>();
-        List<List<String>> studentCoursesMap = new ArrayList<>();
-        
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/students.csv", StandardCharsets.UTF_8))) {
-            bw.write("UserID,Name,Email,Age,Role,Status,CourseCode,GPA\n");
-            
-            for (int i = 1; i <= 1000; i++) {
-                String userId = String.format("HE15%04d", i);
-                studentIds.add(userId);
-                
-                String name = allNames.get(nameIdx++);
-                String prefix = generateEmailPrefix(name, rand);
-                String email = prefix + (rand.nextBoolean() ? "@gmail.com" : "@fpt.edu.vn");
-                String username = prefix;
-                String password = generateRandomPassword(rand);
-                
-                int age = 18 + rand.nextInt(7);
-                String role = "Sinh viên";
-                String status = rand.nextBoolean() ? "active" : "offline";
-                double gpa = Math.round((4.0 + rand.nextDouble() * 6.0) * 10.0) / 10.0;
-                
-                userAccounts.add(String.format("%s,%s,%s,%s,%s,%s", userId, username, email, role, status, password));
-                
-                // Random 3 to 5 courses
-                int numCourses = 3 + rand.nextInt(3);
-                List<String> sCourses = new ArrayList<>();
-                while (sCourses.size() < numCourses) {
-                    String c = COURSES[rand.nextInt(COURSES.length)];
-                    if (!sCourses.contains(c)) sCourses.add(c);
-                }
-                studentCoursesMap.add(sCourses);
-                String courseStr = String.join("|", sCourses);
-                
-                bw.write(String.format("%s,%s,%s,%d,%s,%s,%s,%.1f\n", userId, name, email, age, role, status, courseStr, gpa));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
+            if(usedNames.add(name)) allNames.add(name);
         }
         
-        // 3. Users.csv
-        Collections.shuffle(userAccounts);
+        // 1. Users
+        List<String> userIds = new ArrayList<>();
         try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/users.csv", StandardCharsets.UTF_8))) {
-            bw.write("UserID,Username,Email,Role,Status,Password\n");
-            for (String acc : userAccounts) {
-                bw.write(acc + "\n");
+            bw.write("userId,username,passwordHash,fullName,email,role,createdAt\n");
+            for(int i=0; i<100; i++) {
+                String uId = "U" + String.format("%04d", i+1);
+                userIds.add(uId);
+                String fullName = allNames.get(i);
+                String[] parts = fullName.split(" ");
+                String uname = removeAccents(parts[parts.length-1] + parts[0]) + (10+rand.nextInt(90));
+                String pwd = "hash_" + uname;
+                String email = uname + "@fpt.edu.vn";
+                String role = (i < 10) ? "Teacher" : "Student";
+                bw.write(String.format("%s,%s,%s,%s,%s,%s,2023-10-01 10:00:00\n", uId, uname, pwd, fullName, email, role));
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
+        } catch (Exception e) {}
 
-        // 4. Submissions (2000 rows - ~2 submissions per student)
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/submissions.csv", StandardCharsets.UTF_8))) {
-            bw.write("SubmissionID,StudentID,TeacherID,SubmitTime,Score,ScorePublicTime\n");
-            int subIdCounter = 1;
-            
-            for (int i = 0; i < studentIds.size(); i++) {
-                String studentId = studentIds.get(i);
-                List<String> sCourses = studentCoursesMap.get(i);
+        // 2. RuleDefinition
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("data/rule_definition.csv", StandardCharsets.UTF_8))) {
+            bw.write("ruleId,ruleCode,ruleName,severity,penaltyPoints,description\n");
+            bw.write("1,NPE,NullPointerException,High,2.0,Avoid returning null without check\n");
+            bw.write("2,OOM,OutOfMemoryError,Critical,5.0,Memory leak detected in loop\n");
+            bw.write("3,CS,CodeStyle,Low,0.5,Variable naming convention violation\n");
+        } catch (Exception e) {}
+
+        // 3. Submission & Score & AnalysisResult & RuleViolation
+        int violationId = 1;
+        try (
+            BufferedWriter bwSub = new BufferedWriter(new FileWriter("data/submission.csv", StandardCharsets.UTF_8));
+            BufferedWriter bwScore = new BufferedWriter(new FileWriter("data/score.csv", StandardCharsets.UTF_8));
+            BufferedWriter bwAnal = new BufferedWriter(new FileWriter("data/analysis_result.csv", StandardCharsets.UTF_8));
+            BufferedWriter bwVio = new BufferedWriter(new FileWriter("data/rule_violation.csv", StandardCharsets.UTF_8))
+        ) {
+            bwSub.write("submissionId,userId,fileUrl,fileHash,status,submittedAt\n");
+            bwScore.write("scoreId,submissionId,totalScore,deduction,gradingNotes,updatedAt\n");
+            bwAnal.write("analysisId,submissionId,astJson,aiFeedback,executionTimeMs\n");
+            bwVio.write("violationId,analysisId,ruleId,fileName,lineNumber,suggestedFix\n");
+
+            for(int i=1; i<=200; i++) { // 200 submissions
+                String subId = "SUB" + String.format("%04d", i);
+                String uId = userIds.get(10 + rand.nextInt(90)); // Only students
+                bwSub.write(String.format("%s,%s,http://git.com/%s,hash%s,Graded,2023-10-20\n", subId, uId, subId, subId));
                 
-                // Generate 1 to 3 submissions for this student
-                int numSubmissions = 1 + rand.nextInt(3);
-                for (int s = 0; s < numSubmissions; s++) {
-                    String subId = String.format("SUB%04d", subIdCounter++);
-                    
-                    // Pick a random course the student is taking
-                    String chosenCourse = sCourses.get(rand.nextInt(sCourses.size()));
-                    
-                    // Find all teachers who teach this course
-                    List<String> eligibleTeachers = new ArrayList<>();
-                    for (int t = 0; t < teacherIds.size(); t++) {
-                        if (teacherCoursesMap.get(t).contains(chosenCourse)) {
-                            eligibleTeachers.add(teacherIds.get(t));
-                        }
-                    }
-                    
-                    String teacherId = "";
-                    if (!eligibleTeachers.isEmpty()) {
-                        teacherId = eligibleTeachers.get(rand.nextInt(eligibleTeachers.size()));
-                    } else {
-                        teacherId = teacherIds.get(rand.nextInt(teacherIds.size())); 
-                    }
-                    
-                    String submitTime = "2023-10-20 10:00:00";
-                    double score = Math.round(rand.nextDouble() * 100.0) / 10.0;
-                    String scorePublicTime = "2023-10-21 15:00:00";
-                    
-                    bw.write(String.format("%s,%s,%s,%s,%.1f,%s\n", subId, studentId, teacherId, submitTime, score, scorePublicTime));
+                float deduction = rand.nextInt(4) * 0.5f;
+                float total = 10.0f - deduction;
+                bwScore.write(String.format("%d,%s,%.1f,%.1f,Good job,2023-10-21\n", i, subId, total, deduction));
+                
+                bwAnal.write(String.format("%d,%s,{},AI looks good,150\n", i, subId));
+                
+                if (deduction > 0) {
+                    int rId = 1 + rand.nextInt(3);
+                    bwVio.write(String.format("%d,%d,%d,Main.java,%d,Fix this issue\n", violationId++, i, rId, 10 + rand.nextInt(100)));
                 }
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        System.out.println("\n--- TẠO DỮ LIỆU THÀNH CÔNG ---");
-        
-        // Hiển thị preview 5 dòng đầu tiên của mỗi file ra màn hình
-        previewCSV("data/users.csv");
-        previewCSV("data/students.csv");
-        previewCSV("data/teachers.csv");
-        previewCSV("data/submissions.csv");
-    }
-
-    private static void previewCSV(String filePath) {
-        System.out.println("\n>>> PREVIEW FILE: " + filePath + " <<<");
-        try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(filePath, StandardCharsets.UTF_8))) {
-            String line;
-            int count = 0;
-            while ((line = br.readLine()) != null && count < 5) {
-                System.out.println(line);
-                count++;
-            }
-            System.out.println("... (còn tiếp)");
-        } catch (IOException e) {
-            System.out.println("Không thể đọc file: " + e.getMessage());
-        }
+        } catch (Exception e) {}
+        System.out.println("Generated 6 CSV files matching new ERD.");
     }
 }

@@ -1,120 +1,70 @@
 package com.group1.util;
 
-import com.group1.model.AitaRecord;
-import com.group1.model.Submission;
-import com.group1.model.UserAccount;
+import com.group1.model.*;
 import java.io.BufferedReader;
 import java.io.FileReader;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 public class CSVHelper {
-
-    public static List<UserAccount> readUsersFromCSV(String filePath) {
-        List<UserAccount> accounts = new ArrayList<>();
-        String line = "";
-        String cvsSplitBy = ",";
-
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            br.readLine(); 
+    public static List<Users> readUsers(String path) {
+        List<Users> res = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            br.readLine(); String line;
             while ((line = br.readLine()) != null) {
-                String[] data = line.split(cvsSplitBy, -1);
-                if(data.length >= 6) {
-                    accounts.add(new UserAccount(
-                        data[0].trim(), // userId
-                        data[1].trim(), // username
-                        data[2].trim(), // email
-                        data[3].trim(), // role
-                        data[4].trim(), // status
-                        data[5].trim()  // password
-                    ));
-                }
+                String[] d = line.split(",", -1);
+                if(d.length>=7) res.add(new Users(d[0], d[1], d[2], d[3], d[4], d[5], d[6]));
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return accounts;
+        } catch(Exception e){} return res;
     }
-
-    public static List<AitaRecord> readStudentsFromCSV(String filePath) {
-        List<AitaRecord> records = new ArrayList<>();
-        String line = "";
-        String cvsSplitBy = ",";
-
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            br.readLine(); 
+    public static List<RuleDefinition> readRuleDefinitions(String path) {
+        List<RuleDefinition> res = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            br.readLine(); String line;
             while ((line = br.readLine()) != null) {
-                String[] data = line.split(cvsSplitBy, -1);
-                if(data.length >= 8) {
-                    String userId = data[0].trim();
-                    String name = data[1].trim();
-                    String email = data[2].trim();
-                    int age = data[3].trim().isEmpty() ? 0 : Integer.parseInt(data[3].trim());
-                    String role = data[4].trim();
-                    String status = data[5].trim();
-                    String courseCode = data[6].trim();
-                    double gpa = data[7].trim().isEmpty() ? 0.0 : Double.parseDouble(data[7].trim());
-                    
-                    records.add(new AitaRecord(userId, name, email, age, role, status, courseCode, gpa));
-                }
+                String[] d = line.split(",", -1);
+                if(d.length>=6) res.add(new RuleDefinition(Integer.parseInt(d[0]), d[1], d[2], d[3], Float.parseFloat(d[4]), d[5]));
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return records;
+        } catch(Exception e){} return res;
     }
-
-    public static List<AitaRecord> readTeachersFromCSV(String filePath) {
-        List<AitaRecord> records = new ArrayList<>();
-        String line = "";
-        String cvsSplitBy = ",";
-
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            br.readLine(); 
+    public static List<Submission> readSubmissions(String path) {
+        List<Submission> res = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            br.readLine(); String line;
             while ((line = br.readLine()) != null) {
-                String[] data = line.split(cvsSplitBy, -1);
-                if(data.length >= 7) {
-                    String userId = data[0].trim();
-                    String name = data[1].trim();
-                    String email = data[2].trim();
-                    int age = data[3].trim().isEmpty() ? 0 : Integer.parseInt(data[3].trim());
-                    String role = data[4].trim();
-                    String status = data[5].trim();
-                    String courseCode = data[6].trim();
-                    
-                    records.add(new AitaRecord(userId, name, email, age, role, status, courseCode, 0.0));
-                }
+                String[] d = line.split(",", -1);
+                if(d.length>=6) res.add(new Submission(d[0], d[1], d[2], d[3], d[4], d[5]));
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return records;
+        } catch(Exception e){} return res;
     }
-
-    public static List<Submission> readSubmissionsFromCSV(String filePath) {
-        List<Submission> submissions = new ArrayList<>();
-        String line = "";
-        String cvsSplitBy = ",";
-
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            br.readLine(); 
+    public static List<Score> readScores(String path) {
+        List<Score> res = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            br.readLine(); String line;
             while ((line = br.readLine()) != null) {
-                String[] data = line.split(cvsSplitBy, -1);
-                if(data.length >= 6) {
-                    String submissionId = data[0].trim();
-                    String studentId = data[1].trim();
-                    String teacherId = data[2].trim();
-                    String submitTime = data[3].trim();
-                    double score = data[4].trim().isEmpty() ? 0.0 : Double.parseDouble(data[4].trim());
-                    String scorePublicTime = data[5].trim();
-                    
-                    submissions.add(new Submission(submissionId, studentId, teacherId, submitTime, score, scorePublicTime));
-                }
+                String[] d = line.split(",", -1);
+                if(d.length>=6) res.add(new Score(Integer.parseInt(d[0]), d[1], Float.parseFloat(d[2]), Float.parseFloat(d[3]), d[4], d[5]));
             }
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return submissions;
+        } catch(Exception e){} return res;
+    }
+    public static List<AnalysisResult> readAnalysisResults(String path) {
+        List<AnalysisResult> res = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            br.readLine(); String line;
+            while ((line = br.readLine()) != null) {
+                String[] d = line.split(",", -1);
+                if(d.length>=5) res.add(new AnalysisResult(Integer.parseInt(d[0]), d[1], d[2], d[3], Integer.parseInt(d[4])));
+            }
+        } catch(Exception e){} return res;
+    }
+    public static List<RuleViolation> readRuleViolations(String path) {
+        List<RuleViolation> res = new ArrayList<>();
+        try (BufferedReader br = new BufferedReader(new FileReader(path))) {
+            br.readLine(); String line;
+            while ((line = br.readLine()) != null) {
+                String[] d = line.split(",", -1);
+                if(d.length>=6) res.add(new RuleViolation(Integer.parseInt(d[0]), Integer.parseInt(d[1]), Integer.parseInt(d[2]), d[3], Integer.parseInt(d[4]), d[5]));
+            }
+        } catch(Exception e){} return res;
     }
 }

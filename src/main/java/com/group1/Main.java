@@ -1,64 +1,52 @@
 package com.group1;
 
-import com.group1.dao.AitaRecordDAO;
-import com.group1.dao.AitaRecordDAOImpl;
-import com.group1.dao.SubmissionDAO;
-import com.group1.dao.SubmissionDAOImpl;
-import com.group1.dao.UserAccountDAO;
-import com.group1.dao.UserAccountDAOImpl;
-import com.group1.model.AitaRecord;
-import com.group1.model.Submission;
-import com.group1.model.UserAccount;
+import com.group1.dao.*;
+import com.group1.model.*;
 import com.group1.util.CSVHelper;
-
+import java.sql.Connection;
+import java.sql.DriverManager;
 import java.util.List;
-import java.util.Optional;
 
 public class Main {
     public static void main(String[] args) {
-        System.out.println("=== KẾT NỐI TỚI AITA_DB & NHẬP DỮ LIỆU TỪ 4 FILE CSV ===");
-        
-        AitaRecordDAO aitaDAO = new AitaRecordDAOImpl();
-        SubmissionDAO submissionDAO = new SubmissionDAOImpl();
-        UserAccountDAO userAccountDAO = new UserAccountDAOImpl();
-        
-        String usersFile = "data/users.csv";
-        String studentsFile = "data/students.csv";
-        String teachersFile = "data/teachers.csv";
-        String submissionsFile = "data/submissions.csv";
-        
-        // --- 1. NHẬP DỮ LIỆU USERS ---
-        System.out.println("\n--- Đang đọc dữ liệu Tài khoản từ: " + usersFile + " ---");
-        List<UserAccount> accounts = CSVHelper.readUsersFromCSV(usersFile);
-        for (UserAccount acc : accounts) {
-            userAccountDAO.insert(acc);
-            System.out.println(" -> Đã thêm Tài khoản: " + acc.getUserId());
-        }
+        String url = "jdbc:sqlserver://localhost:1433;databaseName=AITA_DB;encrypt=false;trustServerCertificate=true;";
+        try (Connection conn = DriverManager.getConnection(url, "sa", "password123")) {
+            System.out.println("Connected to SQL Server!");
 
-        // --- 2. NHẬP DỮ LIỆU SINH VIÊN ---
-        System.out.println("\n--- Đang đọc dữ liệu Sinh viên từ: " + studentsFile + " ---");
-        List<AitaRecord> students = CSVHelper.readStudentsFromCSV(studentsFile);
-        for (AitaRecord r : students) {
-            aitaDAO.insert(r);
-            System.out.println(" -> Đã thêm Sinh viên: " + r.getName() + " - Môn: " + r.getCourseCode() + " - GPA: " + r.getGpa());
-        }
+            UsersDAO usersDAO = new UsersDAO(conn);
+            RuleDefinitionDAO ruleDefDAO = new RuleDefinitionDAO(conn);
+            SubmissionDAO subDAO = new SubmissionDAO(conn);
+            ScoreDAO scoreDAO = new ScoreDAO(conn);
+            AnalysisResultDAO analDAO = new AnalysisResultDAO(conn);
+            RuleViolationDAO ruleVioDAO = new RuleViolationDAO(conn);
 
-        // --- 3. NHẬP DỮ LIỆU GIẢNG VIÊN ---
-        System.out.println("\n--- Đang đọc dữ liệu Giảng viên từ: " + teachersFile + " ---");
-        List<AitaRecord> teachers = CSVHelper.readTeachersFromCSV(teachersFile);
-        for (AitaRecord r : teachers) {
-            aitaDAO.insert(r);
-            System.out.println(" -> Đã thêm Giảng viên: " + r.getName() + " - Dạy môn: " + r.getCourseCode());
-        }
+            System.out.println("Inserting Users...");
+            List<Users> users = CSVHelper.readUsers("data/users.csv");
+            for(Users u : users) usersDAO.insert(u);
 
-        // --- 4. NHẬP DỮ LIỆU SUBMISSION ---
-        System.out.println("\n--- Đang đọc dữ liệu Bài nộp từ: " + submissionsFile + " ---");
-        List<Submission> submissions = CSVHelper.readSubmissionsFromCSV(submissionsFile);
-        for (Submission s : submissions) {
-            submissionDAO.insert(s);
-            System.out.println(" -> Đã thêm Submission: " + s.getSubmissionId() + " (Điểm: " + s.getScore() + ")");
+            System.out.println("Inserting RuleDefinitions...");
+            List<RuleDefinition> rules = CSVHelper.readRuleDefinitions("data/rule_definition.csv");
+            for(RuleDefinition r : rules) ruleDefDAO.insert(r);
+
+            System.out.println("Inserting Submissions...");
+            List<Submission> subs = CSVHelper.readSubmissions("data/submission.csv");
+            for(Submission s : subs) subDAO.insert(s);
+
+            System.out.println("Inserting Scores...");
+            List<Score> scores = CSVHelper.readScores("data/score.csv");
+            for(Score s : scores) scoreDAO.insert(s);
+
+            System.out.println("Inserting AnalysisResults...");
+            List<AnalysisResult> anals = CSVHelper.readAnalysisResults("data/analysis_result.csv");
+            for(AnalysisResult a : anals) analDAO.insert(a);
+
+            System.out.println("Inserting RuleViolations...");
+            List<RuleViolation> vios = CSVHelper.readRuleViolations("data/rule_violation.csv");
+            for(RuleViolation v : vios) ruleVioDAO.insert(v);
+
+            System.out.println("Database fully populated with ERD tables!");
+        } catch(Exception e) {
+            e.printStackTrace();
         }
-        
-        System.out.println("\n=== HOÀN TẤT NẠP DỮ LIỆU ===");
     }
 }
