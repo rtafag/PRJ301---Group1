@@ -16,42 +16,48 @@ public class Main {
             UsersDAO usersDAO = new UsersDAO(conn);
             RuleDefinitionDAO ruleDefDAO = new RuleDefinitionDAO(conn);
             SubmissionDAO subDAO = new SubmissionDAO(conn);
-
+            ScoreDAO scoreDAO = new ScoreDAO(conn);
             AnalysisResultDAO analDAO = new AnalysisResultDAO(conn);
             RuleViolationDAO ruleVioDAO = new RuleViolationDAO(conn);
 
             System.out.println("Inserting Users...");
             List<Users> users = CSVHelper.readUsers("data/users.csv");
-            for (Users u : users)
+            for(Users u : users) {
                 usersDAO.insert(u);
+            }
 
             System.out.println("Inserting RuleDefinitions...");
             List<RuleDefinition> rules = CSVHelper.readRuleDefinitions("data/rule_definition.csv");
-            for (RuleDefinition r : rules)
+            for(RuleDefinition r : rules) {
                 ruleDefDAO.insert(r);
+            }
 
             System.out.println("Inserting Submissions...");
             List<Submission> subs = CSVHelper.readSubmissions("data/submission.csv");
-            for (Submission s : subs)
+            for(Submission s : subs) {
                 subDAO.insert(s);
+            }
 
             System.out.println("Inserting Scores...");
             List<Score> scores = CSVHelper.readScores("data/score.csv");
-            for (Score s : scores)
+            for(Score s : scores) {
                 scoreDAO.insert(s);
+            }
 
             System.out.println("Inserting AnalysisResults...");
             List<AnalysisResult> anals = CSVHelper.readAnalysisResults("data/analysis_result.csv");
-            for (AnalysisResult a : anals)
+            for(AnalysisResult a : anals) {
                 analDAO.insert(a);
+            }
 
             System.out.println("Inserting RuleViolations...");
             List<RuleViolation> vios = CSVHelper.readRuleViolations("data/rule_violation.csv");
-            for (RuleViolation v : vios)
+            for(RuleViolation v : vios) {
                 ruleVioDAO.insert(v);
+            }
 
             System.out.println("Database fully populated with ERD tables!");
-        } catch (Exception e) {
+        } catch(Exception e) {
             e.printStackTrace();
         }
     }
