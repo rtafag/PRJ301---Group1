@@ -20,6 +20,10 @@ public class Main {
             AnalysisResultDAO analDAO = new AnalysisResultDAO(conn);
             RuleViolationDAO ruleVioDAO = new RuleViolationDAO(conn);
 
+            /* 
+            ĐÃ COMMENT LẠI ĐỂ TRÁNH LỖI TRÙNG KHÓA CHÍNH (PRIMARY KEY) KHI CHẠY NHIỀU LẦN.
+            (Dữ liệu CSV đã được đẩy thành công vào SQL Server ở lần chạy đầu tiên).
+
             System.out.println("Inserting Users...");
             List<Users> users = CSVHelper.readUsers("data/users.csv");
             for(Users u : users) {
@@ -57,6 +61,7 @@ public class Main {
             }
 
             System.out.println("Database fully populated with ERD tables!");
+            */
 
             // --- IN KẾT QUẢ TỪ SQL SERVER RA MÀN HÌNH ---
             System.out.println("\n=== SQL SERVER SCORES ===");
