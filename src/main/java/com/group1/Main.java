@@ -59,14 +59,14 @@ public class Main {
             System.out.println("Database fully populated with ERD tables!");
 
             // --- IN KẾT QUẢ TỪ SQL SERVER RA MÀN HÌNH ---
-            System.out.println("\n=== KẾT QUẢ ĐIỂM SỐ TỪ SQL SERVER ===");
+            System.out.println("\n=== SQL SERVER SCORES ===");
             try (java.sql.Statement stmt = conn.createStatement();
                  java.sql.ResultSet rs = stmt.executeQuery("SELECT TOP 10 submission_id, total_score FROM Score")) {
                 while (rs.next()) {
-                    System.out.println("Bài nộp: " + rs.getString("submission_id") + 
-                                       "  --->  Điểm: " + rs.getFloat("total_score"));
+                    System.out.println("Submission: " + rs.getString("submission_id") + 
+                                       "  --->  Score: " + rs.getFloat("total_score"));
                 }
-                System.out.println("... (chỉ hiển thị 10 bài đầu tiên)");
+                System.out.println("... (Showing top 10 only)");
             }
             System.out.println("=====================================\n");
 
