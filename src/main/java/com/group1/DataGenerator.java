@@ -194,6 +194,27 @@ public class DataGenerator {
         } catch (IOException e) {
             e.printStackTrace();
         }
-        System.out.println("Data generated successfully with full Users table (random passwords)!");
+        System.out.println("\n--- TẠO DỮ LIỆU THÀNH CÔNG ---");
+        
+        // Hiển thị preview 5 dòng đầu tiên của mỗi file ra màn hình
+        previewCSV("data/users.csv");
+        previewCSV("data/students.csv");
+        previewCSV("data/teachers.csv");
+        previewCSV("data/submissions.csv");
+    }
+
+    private static void previewCSV(String filePath) {
+        System.out.println("\n>>> PREVIEW FILE: " + filePath + " <<<");
+        try (java.io.BufferedReader br = new java.io.BufferedReader(new java.io.FileReader(filePath, StandardCharsets.UTF_8))) {
+            String line;
+            int count = 0;
+            while ((line = br.readLine()) != null && count < 5) {
+                System.out.println(line);
+                count++;
+            }
+            System.out.println("... (còn tiếp)");
+        } catch (IOException e) {
+            System.out.println("Không thể đọc file: " + e.getMessage());
+        }
     }
 }
