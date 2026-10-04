@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Submission Portal | AITA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="AITA home">
+      <span class="brand-mark" aria-hidden="true">A</span>
+      <span><strong>SUBMISSION PORTAL</strong><small>AITA / CODE REVIEW</small></span>
+    </a>
+    <div class="topbar-status"><span class="status-dot"></span><span>PORTAL ONLINE</span></div>
+  </header>
+
+  <main>
+    <section id="login-screen" class="login-layout">
+      <div class="login-intro">
+        <p class="eyebrow">ACADEMIC INTEGRITY &amp; TECHNICAL ANALYSIS</p>
+        <h1>Submit work.<br><span>Understand the result.</span></h1>
+        <p class="intro-copy">A single workspace for source submissions, rule-based review and instructor feedback.</p>
+        <div class="intro-foot"><span class="line-mark"></span><span>STUDENT + TEACHER ACCESS</span></div>
+      </div>
+
+      <form id="login-form" class="login-form" autocomplete="on">
+        <div class="form-heading">
+          <p class="eyebrow">SECURE ACCESS</p>
+          <h2>Sign in</h2>
+        </div>
+        <fieldset class="role-picker">
+          <legend>Continue as</legend>
+          <label><input type="radio" name="role" value="Student" checked><span>Student</span></label>
+          <label><input type="radio" name="role" value="Teacher"><span>Teacher</span></label>
+        </fieldset>
+        <label class="field-label" for="username">Username</label>
+        <input id="username" name="username" autocomplete="username" required>
+        <label class="field-label" for="password-hash">Password hash</label>
+        <input id="password-hash" name="passwordHash" type="password" autocomplete="current-password" required>
+        <p id="login-error" class="form-error" role="alert"></p>
+        <button class="button button-primary button-wide" type="submit">Sign in <span aria-hidden="true">&#8594;</span></button>
+        <p class="login-note">Use the demo credentials provided in the project user data.</p>
+      </form>
+    </section>
+
+    <section id="portal-screen" class="portal-screen" hidden>
+      <aside class="sidebar">
+        <div class="account-block">
+          <span id="account-initial" class="account-initial">A</span>
+          <div><strong id="account-name">Account</strong><span id="account-role">ROLE</span></div>
+        </div>
+        <nav id="main-nav" class="main-nav" aria-label="Main navigation"></nav>
+        <button id="logout-button" class="logout-button" type="button">Log out <span aria-hidden="true">&#8599;</span></button>
+      </aside>
+      <section class="workspace">
+        <div class="workspace-heading">
+          <div><p id="view-kicker" class="eyebrow">WORKSPACE</p><h1 id="view-title">Dashboard</h1></div>
+          <span id="date-label" class="date-label"></span>
+        </div>
+        <div id="workspace-content" class="workspace-content" aria-live="polite"></div>
+      </section>
+    </section>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
