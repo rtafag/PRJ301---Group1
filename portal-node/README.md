@@ -11,14 +11,22 @@ Copy-Item .env.example .env
 npm.cmd start
 ```
 
-Open `http://localhost:3000`. Demo login values are the `username` and `passwordHash` columns in `../data/users.csv`. These are sample credentials, not production password hashes.
+Open `http://localhost:3000`. User IDs run from `GV0001` for teachers and `HE001` for students. Usernames use each roster email's local part, and demo passwords use `hash_<username>`; duplicate email local parts include the lower-case user ID as a suffix. These are sample credentials, not production password hashes.
 
 ## Implemented workflows
 
-- Student login, source upload, SHA-256 duplicate detection, Java syntax parsing, static rule checks, analysis history, and personal grades.
-- Teacher class submission list, summary report, rule configuration, grade editing, and manual feedback.
+- Student login, semester/course grade overview, assignment notifications and viewing, source upload, SHA-256 duplicate detection, Java syntax parsing, static rule checks, and personal grades.
+- Teacher course/semester grade overview, per-course grade editing and manual feedback, rule configuration, and assignment management.
 - Optional OpenAI or Gemini feedback, enabled only by setting the provider and its API key in `.env`. When enabled, the submitted source code is sent to that provider for feedback.
 - Optional Docker execution sandbox. It is disabled by default; submitted programs are never executed unless explicitly enabled and Docker is available.
+
+## Teacher course overview
+
+The course selector reads course codes and enrollments from `../data/students.csv` and teacher assignments from `../data/teachers.csv`. Account IDs are assigned in source CSV order and mapped to those rosters. Students are distributed evenly among all teachers assigned to each course. Since the CSV data has no per-course grades or semester field, demo grades are generated from student GPA for Fall 2026; other semester choices are empty. The portal displays imported students as active without modifying the source student/teacher CSV files. Course names are not present in the supplied data, so courses are displayed by code.
+
+Manual feedback is stored with the selected course, student, and semester. Teachers can create, edit, and delete assignments for their courses, adjust deadlines, and see `Active` or `Expired` status based on the current time.
+
+Students see semester and enrolled course selectors in Overview. Unread assignments produce an English notification such as `New assignment in JPE255: Homework`; opening the assignment marks it as read.
 
 The default storage is local JSON under `storage/`; it does not modify the repository CSV data or connect to SQL Server. The JSON REST API and storage adapter can be replaced with a SQL Server repository when DB credentials/schema are ready.
 
@@ -34,7 +42,19 @@ Set `SANDBOX_ENABLED=true` and provide a pre-pulled Java image in `SANDBOX_IMAGE
 - `POST /api/student/submissions` (multipart field `sourceFile`)
 - `GET /api/student/submissions`
 - `GET /api/student/grades`
+- `GET /api/student/course-grades`
+- `GET /api/student/courses`
+- `GET /api/student/assignments`
+- `PATCH /api/student/assignments/:assignmentId/read`
 - `GET /api/teacher/submissions`
+- `GET /api/teacher/courses`
+- `GET /api/teacher/course-grades`
+- `PATCH /api/teacher/course-grades/:studentId`
+- `PATCH /api/teacher/course-grades/:studentId/feedback`
+- `GET /api/teacher/assignments`
+- `POST /api/teacher/assignments`
+- `PATCH /api/teacher/assignments/:assignmentId`
+- `DELETE /api/teacher/assignments/:assignmentId`
 - `GET /api/teacher/report`
 - `GET /api/teacher/rules`
 - `PATCH /api/teacher/rules/:ruleCode`
