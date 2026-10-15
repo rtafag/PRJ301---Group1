@@ -29,19 +29,41 @@
         <div class="intro-foot"><span class="line-mark"></span><span>STUDENT + TEACHER ACCESS</span></div>
       </div>
 
-      <form id="login-form" class="login-form" autocomplete="on">
-        <div class="form-heading">
-          <p class="eyebrow">SECURE ACCESS</p>
-          <h2>Sign in</h2>
-        </div>
-        <label class="field-label" for="username">Username</label>
-        <input id="username" name="username" autocomplete="username" required>
-        <label class="field-label" for="password-hash">Password hash</label>
-        <input id="password-hash" name="passwordHash" type="password" autocomplete="current-password" required>
-        <p id="login-error" class="form-error" role="alert"></p>
-        <button class="button button-primary button-wide" type="submit">Sign in <span aria-hidden="true">&#8594;</span></button>
-        <p class="login-note">Use the demo credentials provided in the project user data.</p>
-      </form>
+      <div class="login-access">
+        <form id="login-form" class="login-form" autocomplete="on">
+          <div class="form-heading">
+            <p class="eyebrow">SECURE ACCESS</p>
+            <h2>Sign in</h2>
+          </div>
+          <label class="field-label" for="username">Username</label>
+          <input id="username" name="username" autocomplete="username" required>
+          <label class="field-label" for="password-hash">Password</label>
+          <input id="password-hash" name="passwordHash" type="password" autocomplete="current-password" required>
+          <p id="login-error" class="form-error" role="alert"></p>
+          <button class="button button-primary button-wide" type="submit">Sign in <span aria-hidden="true">&#8594;</span></button>
+          <button id="show-password-reset" class="text-button" type="button">Forgot password?</button>
+          <p class="login-note">Use the demo credentials provided in the project user data.</p>
+        </form>
+
+        <form id="password-reset-form" class="login-form" autocomplete="on" hidden>
+          <div class="form-heading">
+            <p class="eyebrow">ACCOUNT RECOVERY</p>
+            <h2>Reset password</h2>
+          </div>
+          <label class="field-label" for="reset-email">Registered email</label>
+          <input id="reset-email" name="email" type="email" autocomplete="email" required>
+          <label class="field-label" for="reset-key">Confirmation key (User ID)</label>
+          <input id="reset-key" name="confirmationKey" autocomplete="off" required>
+          <label class="field-label" for="new-password">New password</label>
+          <input id="new-password" name="newPassword" type="password" minlength="8" autocomplete="new-password" required>
+          <label class="field-label" for="confirm-password">Confirm new password</label>
+          <input id="confirm-password" name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required>
+          <p id="reset-error" class="form-error" role="alert"></p>
+          <button class="button button-primary button-wide" type="submit">Update password <span aria-hidden="true">&#8594;</span></button>
+          <button id="back-to-login" class="text-button" type="button">Back to sign in</button>
+          <p class="login-note">For this demo, verify your registered email with your User ID.</p>
+        </form>
+      </div>
     </section>
 
     <section id="portal-screen" class="portal-screen" hidden>
