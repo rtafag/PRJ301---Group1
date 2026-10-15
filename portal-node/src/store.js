@@ -179,6 +179,14 @@ export function createStore() {
     enabled: true
   }));
   const runtime = readRuntimeData();
+  const passwordOverrides = runtime?.passwordOverrides && typeof runtime.passwordOverrides === 'object'
+    ? { ...runtime.passwordOverrides }
+    : {};
+  for (const user of users) {
+    if (typeof passwordOverrides[user.userId] === 'string') {
+      user.passwordHash = passwordOverrides[user.userId];
+    }
+  }
   let submissions = Array.isArray(runtime?.submissions) ? runtime.submissions : createSeedSubmissions();
   let rules = Array.isArray(runtime?.rules) ? runtime.rules : csvRules;
   let courseGrades = Array.isArray(runtime?.courseGrades) ? runtime.courseGrades : createCourseGrades();
@@ -200,7 +208,7 @@ export function createStore() {
   function persist() {
     fs.mkdirSync(runtimeDirectory, { recursive: true });
     const temporaryFile = `${runtimeFile}.tmp`;
-    fs.writeFileSync(temporaryFile, JSON.stringify({ submissions, rules, courseGrades, assignments }, null, 2), 'utf8');
+    fs.writeFileSync(temporaryFile, JSON.stringify({ submissions, rules, courseGrades, assignments, passwordOverrides }, null, 2), 'utf8');
     fs.renameSync(temporaryFile, runtimeFile);
   }
 
@@ -208,6 +216,15 @@ export function createStore() {
     users,
     findUser(username) {
       return users.find((user) => user.username === username) ?? null;
+    },
+    resetPassword(email, confirmationKey, passwordHash) {
+      const user = users.find((item) => item.email.trim().toLowerCase() === email
+        && item.userId === confirmationKey);
+      if (!user) return false;
+      user.passwordHash = passwordHash;
+      passwordOverrides[user.userId] = passwordHash;
+      persist();
+      return true;
     },
     listSubmissions() {
       return [...submissions];
