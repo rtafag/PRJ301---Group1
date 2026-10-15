@@ -52,6 +52,27 @@ test('login determines the role from the matching account credentials', () => {
   assert.ok(auth.getUser(studentSession.token));
 });
 
+test('password reset requires matching email and User ID and updates login credentials', () => {
+  const user = {
+    userId: 'HE001', username: 'student1', email: 'student@example.com',
+    passwordHash: 'student_hash', fullName: 'Demo Student', role: 'Student'
+  };
+  const auth = createAuth({
+    findUser: (username) => user.username === username ? user : null,
+    resetPassword: (email, confirmationKey, passwordHash) => {
+      if (email !== user.email || confirmationKey !== user.userId) return false;
+      user.passwordHash = passwordHash;
+      return true;
+    }
+  });
+
+  assert.equal(auth.resetPassword({ email: user.email, confirmationKey: 'WRONG', newPassword: 'new-password' }), false);
+  assert.equal(auth.resetPassword({ email: user.email, confirmationKey: user.userId, newPassword: 'short' }), false);
+  assert.equal(auth.resetPassword({ email: user.email, confirmationKey: user.userId, newPassword: 'new-password' }), true);
+  assert.equal(auth.login({ username: user.username, passwordHash: 'student_hash' }), null);
+  assert.ok(auth.login({ username: user.username, passwordHash: 'new-password' }));
+});
+
 test('course students are evenly split among assigned teachers', () => {
   const store = createStore();
   const teachers = parse(readFileSync(new URL('../../data/teachers.csv', import.meta.url), 'utf8'), {
