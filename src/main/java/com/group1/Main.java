@@ -1,4 +1,4 @@
-1package com.group1;
+package com.group1;
 
 import com.group1.console.ConsoleDataStore;
 import com.group1.model.AnalysisResult;
@@ -7,6 +7,8 @@ import com.group1.model.RuleViolation;
 import com.group1.model.Score;
 import com.group1.model.Submission;
 import com.group1.model.Users;
+import com.group1.model.main.AnalysisOutcome;
+import com.group1.model.main.Finding;
 import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -874,24 +876,4 @@ public class Main {
         }
     }
 
-    private static final class Finding {
-        private final RuleDefinition rule;
-        private final int line;
-        private final String suggestion;
-
-        private Finding(RuleDefinition rule, int line, String suggestion) {
-            this.rule = rule;
-            this.line = line;
-            this.suggestion = suggestion;
-        }
-    }
-
-    private static final class AnalysisOutcome {
-        private boolean syntaxValid;
-        private int classCount;
-        private int methodCount;
-        private float deduction;
-        private String feedback;
-        private final List<Finding> findings = new ArrayList<>();
-    }
 }
