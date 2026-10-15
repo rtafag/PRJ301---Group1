@@ -67,6 +67,19 @@ app.post('/api/auth/login', (request, response) => {
   return response.json(result);
 });
 
+app.post('/api/auth/password-reset', (request, response) => {
+  const { email, confirmationKey, newPassword } = request.body ?? {};
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+      || typeof confirmationKey !== 'string' || !confirmationKey.trim()
+      || typeof newPassword !== 'string' || newPassword.length < 8) {
+    return response.status(400).json({ error: 'Enter a valid email, confirmation key, and password of at least 8 characters.' });
+  }
+  if (!auth.resetPassword({ email, confirmationKey, newPassword })) {
+    return response.status(400).json({ error: 'Email and confirmation key do not match an account.' });
+  }
+  return response.json({ message: 'Password updated. You can now sign in with your new password.' });
+});
+
 app.post('/api/auth/logout', requireAuth(auth), (request, response) => {
   auth.logout(request.sessionToken);
   return response.status(204).end();
