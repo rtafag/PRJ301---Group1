@@ -11,13 +11,13 @@ public final class DBConnection {
     }
 
     public static Connection getConnection() throws SQLException {
-        String url = System.getenv().getOrDefault("DB_URL", DEFAULT_URL);
-        String username = System.getenv("DB_USER");
-        String password = System.getenv("DB_PASSWORD");
-        if (username == null || password == null) {
-            throw new SQLException(
-                    "Set DB_USER and DB_PASSWORD environment variables before starting the application.");
+        try {
+            Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+        } catch (ClassNotFoundException ignored) {
         }
+        String url = System.getenv().getOrDefault("DB_URL", DEFAULT_URL);
+        String username = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "sa";
+        String password = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "password123";
         return DriverManager.getConnection(url, username, password);
     }
 }
