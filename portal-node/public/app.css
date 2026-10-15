@@ -43,6 +43,7 @@ button { cursor: pointer; }
 .intro-copy { max-width: 425px; margin: 24px 0 0; color: var(--muted); font-size: 16px; line-height: 1.65; }
 .intro-foot { display: flex; gap: 12px; align-items: center; margin-top: 48px; color: var(--muted); font: 10px "DM Mono", Consolas, monospace; letter-spacing: .08em; }
 .line-mark { width: 42px; height: 2px; background: var(--coral); }
+.login-access { min-width: 0; }
 .login-form { padding: 34px; border: 1px solid var(--line); border-top: 4px solid var(--forest); background: var(--surface); box-shadow: var(--shadow); }
 .form-heading h2 { margin: 0 0 27px; font-size: 27px; letter-spacing: -.035em; }
 .field-label { display: block; margin: 16px 0 7px; font-size: 12px; font-weight: 600; }
@@ -56,6 +57,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--forest); box-sha
 .button-danger { background: #f9e8e3; color: #9e3824; }
 .login-note { margin: 16px 0 0; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .form-error { min-height: 18px; margin: 8px 0 0; color: #aa382d; font-size: 12px; }
+.text-button { display: block; margin: 13px 0 0 auto; border: 0; padding: 0; background: transparent; color: var(--forest); font-size: 12px; font-weight: 600; }
+.text-button:hover { text-decoration: underline; }
 
 .portal-screen { min-height: calc(100vh - 74px); display: grid; grid-template-columns: 230px minmax(0, 1fr); }
 .sidebar { display: flex; flex-direction: column; padding: 26px 15px 18px; background: var(--forest-dark); color: white; }
