@@ -13,6 +13,10 @@ npm.cmd start
 
 Open `http://localhost:3000`. User IDs run from `GV0001` for teachers and `HE001` for students. Usernames use each roster email's local part, and demo passwords use `hash_<username>`; duplicate email local parts include the lower-case user ID as a suffix. These are sample credentials, not production password hashes.
 
+## Password recovery
+
+The login screen can reset a password after matching the account's registered email and User ID. The new password must contain at least 8 characters and is stored as a scrypt hash in the local runtime data. This demo validates the email but does not send email; production recovery should use a short-lived, single-use token delivered to the account email instead of relying on a User ID.
+
 ## Implemented workflows
 
 - Student login, semester/course grade overview, assignment notifications and viewing, source upload, SHA-256 duplicate detection, Java syntax parsing, static rule checks, and personal grades.
@@ -37,6 +41,7 @@ Set `SANDBOX_ENABLED=true` and provide a pre-pulled Java image in `SANDBOX_IMAGE
 ## API
 
 - `POST /api/auth/login`
+- `POST /api/auth/password-reset` (`email`, `confirmationKey`, `newPassword`)
 - `POST /api/auth/logout`
 - `GET /api/me`
 - `POST /api/student/submissions` (multipart field `sourceFile`)
