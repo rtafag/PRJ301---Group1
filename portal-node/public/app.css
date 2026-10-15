@@ -45,13 +45,6 @@ button { cursor: pointer; }
 .line-mark { width: 42px; height: 2px; background: var(--coral); }
 .login-form { padding: 34px; border: 1px solid var(--line); border-top: 4px solid var(--forest); background: var(--surface); box-shadow: var(--shadow); }
 .form-heading h2 { margin: 0 0 27px; font-size: 27px; letter-spacing: -.035em; }
-.role-picker { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; border: 0; padding: 4px; margin: 0 0 23px; background: var(--paper); }
-.role-picker legend { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
-.role-picker label { cursor: pointer; }
-.role-picker input { position: absolute; opacity: 0; }
-.role-picker span { display: block; padding: 11px; text-align: center; color: var(--muted); font-size: 13px; }
-.role-picker input:checked + span { background: var(--forest); color: white; }
-.role-picker input:focus-visible + span { outline: 2px solid var(--coral); outline-offset: 2px; }
 .field-label { display: block; margin: 16px 0 7px; font-size: 12px; font-weight: 600; }
 input:not([type="radio"]), textarea, select { width: 100%; border: 1px solid var(--line); border-radius: 2px; padding: 11px 12px; background: white; color: var(--ink); outline: none; }
 input:focus, textarea:focus, select:focus { border-color: var(--forest); box-shadow: 0 0 0 3px rgba(23,77,59,.1); }
@@ -112,11 +105,62 @@ textarea { min-height: 110px; resize: vertical; }
 .toast { position: fixed; right: 20px; bottom: 20px; z-index: 5; max-width: min(420px, calc(100vw - 40px)); padding: 12px 16px; transform: translateY(20px); opacity: 0; pointer-events: none; background: var(--ink); color: white; font-size: 12px; transition: opacity .18s ease, transform .18s ease; }
 .toast.show { transform: translateY(0); opacity: 1; }
 .loading { color: var(--muted); font: 11px "DM Mono", Consolas, monospace; }
+.course-layout { display: grid; grid-template-columns: 210px minmax(0, 1fr); gap: 24px; align-items: start; }
+.semester-panel { overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.semester-panel-heading { display: flex; justify-content: space-between; align-items: center; padding: 14px 15px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.semester-panel-heading span { display: grid; width: 25px; height: 25px; place-items: center; border: 1px solid var(--line); border-radius: 50%; color: var(--muted); font-size: 11px; }
+.semester-group { padding: 13px 12px; border-bottom: 1px solid var(--line); }
+.semester-group:last-child { border-bottom: 0; }
+.semester-group h2 { margin: 0 0 8px; padding: 0 9px; color: var(--muted); font: 10px "DM Mono", Consolas, monospace; }
+.semester-button { width: 100%; margin-top: 3px; border: 0; border-radius: 6px; padding: 10px 9px; background: transparent; color: var(--ink); text-align: left; font-size: 13px; font-weight: 600; }
+.semester-button:hover { background: var(--paper); }
+.semester-button.active { background: var(--forest); color: white; }
+.course-browser, .course-grade-view { min-width: 0; }
+.course-search-row { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: -2px 0 26px; }
+.course-search-label { color: var(--muted); font-size: 12px; }
+.course-search-row input { max-width: 360px; border-radius: 8px; }
+.course-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.course-card { display: flex; min-width: 0; min-height: 232px; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; padding: 20px 20px 0; background: var(--surface); color: var(--ink); text-align: left; transition: border-color .16s ease, transform .16s ease, box-shadow .16s ease; }
+.course-card:hover { transform: translateY(-2px); border-color: #9aafa2; box-shadow: var(--shadow); }
+.course-card-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.course-code-mark { display: grid; min-width: 48px; min-height: 48px; place-items: center; border-radius: 7px; padding: 5px; background: var(--soft-green); color: var(--forest); font-size: 12px; font-weight: 700; }
+.course-card-title { margin-top: 17px; font-size: 18px; font-weight: 700; }
+.course-card-subtitle { margin-top: 5px; color: var(--muted); font-size: 12px; }
+.course-card-footer { display: flex; justify-content: space-between; align-items: center; margin: auto -20px 0; border-top: 1px solid var(--line); padding: 13px 20px; color: var(--muted); font-size: 12px; }
+.course-arrow { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; background: var(--paper); }
+.course-grade-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; margin-bottom: 18px; }
+.course-grade-heading .eyebrow { margin: 15px 0 6px; }
+.course-grade-heading h2 { margin: 0; font-size: 24px; }
+.course-grade-heading p:last-child { margin: 6px 0 0; color: var(--muted); font-size: 12px; }
+.course-grade-heading > .button { flex: 0 0 auto; }
+.student-notifications { margin-bottom: 24px; border: 1px solid var(--line); border-left: 3px solid var(--coral); padding: 16px 18px; background: var(--surface); }
+.student-notifications-heading { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.student-notifications-heading h2 { margin: 0; font-size: 15px; }
+.student-notifications-heading span { color: var(--muted); font: 10px "DM Mono", Consolas, monospace; }
+.student-notification { display: flex; justify-content: space-between; align-items: center; gap: 16px; border-top: 1px solid var(--line); padding: 12px 0; }
+.student-notification strong { font-size: 12px; }
+.student-notification p { margin: 5px 0 0; color: var(--muted); font-size: 11px; }
+.student-notifications .empty-state { margin: 10px 0; }
+.text-action { border: 0; padding: 7px 0 0; background: transparent; color: var(--forest); font-size: 11px; font-weight: 600; }
+.text-action:hover { text-decoration: underline; }
+.student-assignment-table { min-width: 700px; }
+.assignment-new { margin-left: 8px; background: #fff0d5; color: #77551a; }
+.student-assignment-detail { max-width: 900px; }
+.student-assignment-detail .section-heading { margin-top: 22px; }
+.assignment-course-label { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
+.student-assignment-description { border-left: 3px solid var(--line); padding: 16px 18px; background: var(--surface); font-size: 14px; line-height: 1.6; white-space: pre-wrap; }
+.assignment-description { display: block; max-width: 340px; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+.assignment-table { min-width: 850px; }
+.assignment-actions { display: flex; min-width: 245px; flex-wrap: wrap; gap: 5px; }
+.assignment-actions .button { padding: 7px 8px; font-size: 10px; }
+#assignment-form .button-secondary { margin-left: 8px; }
 
 @media (max-width: 850px) {
   .login-layout { grid-template-columns: 1fr  minmax(300px, .8fr); gap: 32px; }
   .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .portal-screen { grid-template-columns: 190px minmax(0, 1fr); }
+  .course-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .course-layout { grid-template-columns: 190px minmax(0, 1fr); gap: 16px; }
 }
 @media (max-width: 650px) {
   .topbar { height: 64px; padding: 0 16px; }
@@ -127,6 +171,17 @@ textarea { min-height: 110px; resize: vertical; }
   .intro-foot { margin-top: 24px; }
   .login-form { padding: 23px; }
   .portal-screen { display: block; min-height: calc(100vh - 64px); }
+  .course-layout { grid-template-columns: 1fr; }
+  .semester-panel { display: flex; flex-wrap: wrap; }
+  .semester-panel-heading { width: 100%; }
+  .semester-group { flex: 1 1 130px; border-right: 1px solid var(--line); }
+  .course-grid { grid-template-columns: 1fr; }
+  .course-search-row { align-items: stretch; flex-direction: column; gap: 7px; }
+  .course-search-row input { max-width: none; }
+  .course-grade-heading { flex-wrap: wrap; }
+  .student-notification { align-items: flex-start; flex-direction: column; }
+  .assignment-actions { min-width: 220px; }
+  #assignment-form .button-secondary { margin: 10px 0 0 8px; }
   .sidebar { padding: 12px; }
   .account-block { padding: 0 4px 11px; }
   .main-nav { display: flex; overflow-x: auto; margin-top: 11px; padding-bottom: 2px; }
@@ -144,7 +199,7 @@ textarea { min-height: 110px; resize: vertical; }
   .rule-row .rule-enabled { grid-column: 1 / -1; }
 }
 @media print {
-  .topbar, .sidebar, .workspace-heading .date-label, .button, .content-form { display: none !important; }
+  .topbar, .sidebar, .semester-panel, .student-notifications, .workspace-heading .date-label, .button, .content-form { display: none !important; }
   body, .workspace { background: white; padding: 0; }
   .portal-screen { display: block; }
 }
