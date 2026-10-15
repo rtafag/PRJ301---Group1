@@ -36,6 +36,14 @@ function publicSubmission(submission) {
   return visible;
 }
 
+function publicAssignment(assignment) {
+  const { readBy, ...visible } = assignment;
+  return {
+    ...visible,
+    status: new Date(assignment.dueAt).getTime() <= Date.now() ? 'Expired' : 'Active'
+  };
+}
+
 function getOwnedSubmission(request, response) {
   const submission = store.findSubmission(request.params.submissionId);
   if (!submission || submission.userId !== request.user.userId) {
@@ -55,7 +63,7 @@ app.get('/api/health', (request, response) => {
 
 app.post('/api/auth/login', (request, response) => {
   const result = auth.login(request.body ?? {});
-  if (!result) return response.status(401).json({ error: 'Invalid role or credentials.' });
+  if (!result) return response.status(401).json({ error: 'Invalid username or password.' });
   return response.json(result);
 });
 
@@ -140,6 +148,29 @@ app.get('/api/student/grades', studentOnly, (request, response) => {
   response.json({ grades });
 });
 
+app.get('/api/student/course-grades', studentOnly, (request, response) => {
+  response.json({ courseGrades: store.listCourseGradesForStudent(request.user.userId) });
+});
+
+app.get('/api/student/courses', studentOnly, (request, response) => {
+  response.json({
+    courses: store.listCoursesForStudent(request.user.userId),
+    semesters: store.listSemesters()
+  });
+});
+
+app.get('/api/student/assignments', studentOnly, (request, response) => {
+  const assignments = store.listAssignmentsForStudent(request.user.userId)
+    .map((assignment) => ({ ...publicAssignment(assignment), isRead: assignment.isRead }));
+  return response.json({ assignments });
+});
+
+app.patch('/api/student/assignments/:assignmentId/read', studentOnly, (request, response) => {
+  const assignment = store.markAssignmentRead(request.user.userId, request.params.assignmentId);
+  if (!assignment) return response.status(404).json({ error: 'Assignment not found for your courses.' });
+  return response.json({ assignment: { ...publicAssignment(assignment), isRead: true } });
+});
+
 app.get('/api/student/submissions/:submissionId', studentOnly, (request, response) => {
   const submission = getOwnedSubmission(request, response);
   if (submission) response.json({ submission: publicSubmission(submission) });
@@ -166,6 +197,114 @@ app.get('/api/teacher/submissions', teacherOnly, (request, response) => {
     studentName: students.get(submission.userId) ?? 'Unknown student'
   }));
   response.json({ submissions });
+});
+
+app.get('/api/teacher/courses', teacherOnly, (request, response) => {
+  response.json({
+    courses: store.listCoursesForTeacher(request.user.userId),
+    semesters: store.listSemesters()
+  });
+});
+
+app.get('/api/teacher/course-grades', teacherOnly, (request, response) => {
+  const courseCode = String(request.query.courseCode ?? '').trim();
+  const semester = String(request.query.semester ?? '').trim();
+  if (!courseCode || !semester) {
+    return response.status(400).json({ error: 'Select a course and semester.' });
+  }
+  const grades = store.listCourseGrades(request.user.userId, courseCode, semester);
+  if (grades === null) return response.status(403).json({ error: 'This course is not assigned to your account.' });
+  return response.json({ grades });
+});
+
+app.patch('/api/teacher/course-grades/:studentId', teacherOnly, (request, response) => {
+  const courseCode = String(request.body?.courseCode ?? '').trim();
+  const semester = String(request.body?.semester ?? '').trim();
+  const totalScore = Number(request.body?.totalScore);
+  const deduction = Number(request.body?.deduction ?? 0);
+  if (!Number.isFinite(totalScore) || totalScore < 0 || totalScore > 10
+      || !Number.isFinite(deduction) || deduction < 0 || deduction > 10) {
+    return response.status(400).json({ error: 'Score and deduction must be between 0 and 10.' });
+  }
+  if (!store.listCoursesForTeacher(request.user.userId).some((course) => course.courseCode === courseCode)) {
+    return response.status(403).json({ error: 'This course is not assigned to your account.' });
+  }
+  const grade = store.updateCourseGrade(request.user.userId, courseCode, semester, request.params.studentId, {
+    totalScore,
+    deduction,
+    gradingNotes: String(request.body?.gradingNotes ?? '').slice(0, 2000)
+  });
+  if (!grade) return response.status(404).json({ error: 'Course grade not found.' });
+  return response.json({ grade });
+});
+
+app.patch('/api/teacher/course-grades/:studentId/feedback', teacherOnly, (request, response) => {
+  const courseCode = String(request.body?.courseCode ?? '').trim();
+  const semester = String(request.body?.semester ?? '').trim();
+  const manualFeedback = String(request.body?.manualFeedback ?? '').trim();
+  if (manualFeedback.length > 4000) {
+    return response.status(400).json({ error: 'Feedback must be 4000 characters or fewer.' });
+  }
+  if (!store.listCoursesForTeacher(request.user.userId).some((course) => course.courseCode === courseCode)) {
+    return response.status(403).json({ error: 'This course is not assigned to your account.' });
+  }
+  const grade = store.updateCourseFeedback(request.user.userId, courseCode, semester, request.params.studentId, manualFeedback);
+  if (!grade) return response.status(404).json({ error: 'Course grade not found.' });
+  return response.json({ grade });
+});
+
+app.get('/api/teacher/assignments', teacherOnly, (request, response) => {
+  const assignments = store.listAssignmentsForTeacher(request.user.userId).map(publicAssignment);
+  return response.json({ assignments });
+});
+
+app.post('/api/teacher/assignments', teacherOnly, (request, response) => {
+  const title = String(request.body?.title ?? '').trim();
+  const courseCode = String(request.body?.courseCode ?? '').trim();
+  const description = String(request.body?.description ?? '').trim();
+  const dueAt = new Date(request.body?.dueAt);
+  if (!title || title.length > 120 || description.length > 4000 || Number.isNaN(dueAt.valueOf())) {
+    return response.status(400).json({ error: 'Enter a title, valid deadline, and description under 4000 characters.' });
+  }
+  if (!store.listCoursesForTeacher(request.user.userId).some((course) => course.courseCode === courseCode)) {
+    return response.status(403).json({ error: 'This course is not assigned to your account.' });
+  }
+  const assignment = store.createAssignment(request.user.userId, {
+    title,
+    courseCode,
+    description,
+    dueAt: dueAt.toISOString()
+  });
+  return response.status(201).json({ assignment: publicAssignment(assignment) });
+});
+
+app.patch('/api/teacher/assignments/:assignmentId', teacherOnly, (request, response) => {
+  const existing = store.findAssignmentForTeacher(request.user.userId, request.params.assignmentId);
+  if (!existing) return response.status(404).json({ error: 'Assignment not found.' });
+  const title = String(request.body?.title ?? existing.title).trim();
+  const courseCode = String(request.body?.courseCode ?? existing.courseCode).trim();
+  const description = String(request.body?.description ?? existing.description).trim();
+  const dueAt = new Date(request.body?.dueAt ?? existing.dueAt);
+  if (!title || title.length > 120 || description.length > 4000 || Number.isNaN(dueAt.valueOf())) {
+    return response.status(400).json({ error: 'Enter a title, valid deadline, and description under 4000 characters.' });
+  }
+  if (!store.listCoursesForTeacher(request.user.userId).some((course) => course.courseCode === courseCode)) {
+    return response.status(403).json({ error: 'This course is not assigned to your account.' });
+  }
+  const assignment = store.updateAssignment(request.user.userId, request.params.assignmentId, {
+    title,
+    courseCode,
+    description,
+    dueAt: dueAt.toISOString()
+  });
+  return response.json({ assignment: publicAssignment(assignment) });
+});
+
+app.delete('/api/teacher/assignments/:assignmentId', teacherOnly, (request, response) => {
+  if (!store.deleteAssignment(request.user.userId, request.params.assignmentId)) {
+    return response.status(404).json({ error: 'Assignment not found.' });
+  }
+  return response.status(204).end();
 });
 
 app.get('/api/teacher/report', teacherOnly, (request, response) => {
