@@ -1,6 +1,18 @@
-import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+
+function hashPassword(password) {
+  const salt = randomBytes(16).toString('hex');
+  const digest = scryptSync(String(password), salt, 64).toString('hex');
+  return `$scrypt$${salt}$${digest}`;
+}
 
 function matchesPasswordHash(candidate, expected) {
+  if (String(expected).startsWith('$scrypt$')) {
+    const [, , salt, digest] = String(expected).split('$');
+    if (!salt || !digest) return false;
+    const actual = scryptSync(String(candidate), salt, Buffer.from(digest, 'hex').length);
+    return timingSafeEqual(actual, Buffer.from(digest, 'hex'));
+  }
   const candidateDigest = createHash('sha256').update(String(candidate)).digest();
   const expectedDigest = createHash('sha256').update(String(expected)).digest();
   return timingSafeEqual(candidateDigest, expectedDigest);
@@ -24,6 +36,15 @@ export function createAuth(store) {
         expiresAt: Date.now() + lifetimeMs
       });
       return { token, user: sessions.get(token) };
+    },
+    resetPassword({ email, confirmationKey, newPassword }) {
+      const password = String(newPassword ?? '');
+      if (password.length < 8) return false;
+      return store.resetPassword(
+        String(email ?? '').trim().toLowerCase(),
+        String(confirmationKey ?? '').trim(),
+        hashPassword(password)
+      );
     },
     getUser(token) {
       const session = sessions.get(token);
