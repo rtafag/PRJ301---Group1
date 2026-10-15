@@ -490,6 +490,47 @@ document.querySelector('#login-form').addEventListener('submit', async (event) =
   }
 });
 
+document.querySelector('#show-password-reset').addEventListener('click', () => {
+  document.querySelector('#login-form').hidden = true;
+  document.querySelector('#password-reset-form').hidden = false;
+  document.querySelector('#reset-email').focus();
+});
+
+document.querySelector('#back-to-login').addEventListener('click', () => {
+  document.querySelector('#password-reset-form').hidden = true;
+  document.querySelector('#login-form').hidden = false;
+  document.querySelector('#username').focus();
+});
+
+document.querySelector('#password-reset-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const formElement = event.currentTarget;
+  const form = new FormData(formElement);
+  const errorElement = document.querySelector('#reset-error');
+  errorElement.textContent = '';
+  if (form.get('newPassword') !== form.get('confirmPassword')) {
+    errorElement.textContent = 'Passwords do not match.';
+    return;
+  }
+  try {
+    await api('/api/auth/password-reset', {
+      method: 'POST',
+      body: JSON.stringify({
+        email: form.get('email'),
+        confirmationKey: form.get('confirmationKey'),
+        newPassword: form.get('newPassword')
+      })
+    });
+    formElement.reset();
+    document.querySelector('#password-reset-form').hidden = true;
+    document.querySelector('#login-form').hidden = false;
+    document.querySelector('#login-error').textContent = 'Password updated. Sign in with your new password.';
+    document.querySelector('#username').focus();
+  } catch (error) {
+    errorElement.textContent = error.message;
+  }
+});
+
 document.querySelector('#logout-button').addEventListener('click', async () => {
   try { await api('/api/auth/logout', { method: 'POST' }); } catch { /* Clear local session even if the server has restarted. */ }
   state.token = null;
