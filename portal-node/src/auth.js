@@ -11,10 +11,9 @@ export function createAuth(store) {
   const lifetimeMs = 8 * 60 * 60 * 1000;
 
   return {
-    login({ username, passwordHash, role }) {
+    login({ username, passwordHash }) {
       const user = store.findUser(String(username ?? '').trim());
-      if (!user || user.role.toLowerCase() !== String(role ?? '').toLowerCase()) return null;
-      if (!matchesPasswordHash(passwordHash ?? '', user.passwordHash)) return null;
+      if (!user || !matchesPasswordHash(passwordHash ?? '', user.passwordHash)) return null;
 
       const token = randomBytes(32).toString('base64url');
       sessions.set(token, {
