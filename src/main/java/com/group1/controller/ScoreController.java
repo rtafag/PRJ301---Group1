@@ -20,7 +20,7 @@ public class ScoreController extends HttpServlet {
         try (Connection connection = DBConnection.getConnection()) {
             List<Score> scores = new ScoreDAO(connection).findAll();
             request.setAttribute("scores", scores);
-            request.getRequestDispatcher("/WEB-INF/views/scores.jsp").forward(request, response);
+            request.getRequestDispatcher("/WEB-INF/views/score-view.jsp").forward(request, response);
         } catch (Exception exception) {
             throw new ServletException("Unable to load scores.", exception);
         }
