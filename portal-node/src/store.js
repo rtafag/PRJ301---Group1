@@ -83,6 +83,23 @@ function safeNumber(value, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function sourceShingles(source) {
+  const uncommented = String(source).replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/.*$/gm, ' ');
+  const tokens = (uncommented.match(/[A-Za-z_$][\w$]*|\d+(?:\.\d+)?|[^\s]/g) ?? []).slice(0, 20000);
+  const shingles = new Set();
+  for (let index = 0; index <= tokens.length - 5; index += 1) {
+    shingles.add(tokens.slice(index, index + 5).join(' '));
+  }
+  return shingles;
+}
+
+function jaccardSimilarity(first, second) {
+  if (!first.size || !second.size) return 0;
+  let overlap = 0;
+  for (const shingle of first) if (second.has(shingle)) overlap += 1;
+  return overlap / (first.size + second.size - overlap);
+}
+
 export function createStore() {
   const users = readCsv('users.csv').map((row) => ({
     userId: row.userId,
@@ -92,14 +109,22 @@ export function createStore() {
     email: row.email,
     role: row.role
   }));
+  const runtime = readRuntimeData();
+  const profileOverrides = runtime?.profileOverrides && typeof runtime.profileOverrides === 'object'
+    ? runtime.profileOverrides
+    : {};
+  for (const user of users) {
+    Object.assign(user, profileOverrides[user.userId] ?? {});
+  }
   const teacherUsers = users.filter((user) => user.role.toLowerCase() === 'teacher');
   const studentUsers = users.filter((user) => user.role.toLowerCase() === 'student');
   const academicStudents = readCsv('students.csv').map((row, index) => ({
     studentId: studentUsers[index]?.userId ?? row.UserID,
     sourceStudentId: row.UserID,
-    fullName: row.Name,
+    fullName: studentUsers[index]?.fullName ?? row.Name,
     gpa: Number(row.GPA),
-    courseCodes: String(row.CourseCode ?? '').split('|').filter(Boolean),
+    courseCodes: runtime?.classManagement?.enrollments?.[studentUsers[index]?.userId ?? row.UserID]
+      ?? String(row.CourseCode ?? '').split('|').filter(Boolean),
     status: 'active'
   }));
   const academicTeachers = readCsv('teachers.csv').map((row, index) => ({
@@ -109,18 +134,30 @@ export function createStore() {
     courseCodes: String(row.CourseCode ?? '').split('|').filter(Boolean)
   }));
   const teacherProfileByUser = new Map(academicTeachers.map((teacher) => [teacher.teacherId, teacher]));
-  const teacherCourseAssignments = new Map(academicTeachers.map((teacher) => [teacher.teacherId, teacher.courseCodes]));
-  const teachersByCourse = new Map();
+  const teacherCourseAssignments = new Map(academicTeachers.map((teacher) => [teacher.teacherId, [...teacher.courseCodes]]));
+  const courseTeacherAssignments = new Map();
   for (const teacher of academicTeachers) {
     for (const courseCode of teacher.courseCodes) {
-      const teachers = teachersByCourse.get(courseCode) ?? [];
-      teachers.push(teacher.teacherId);
-      teachersByCourse.set(courseCode, teachers);
+      const teacherIds = courseTeacherAssignments.get(courseCode) ?? [];
+      teacherIds.push(teacher.teacherId);
+      courseTeacherAssignments.set(courseCode, teacherIds);
+    }
+  }
+  for (const [courseCode, teacherIds] of Object.entries(runtime?.classManagement?.courseTeachers ?? {})) {
+    const validTeacherIds = teacherIds.filter((teacherId) => teacherUsers.some((teacher) => teacher.userId === teacherId));
+    courseTeacherAssignments.set(courseCode, validTeacherIds);
+    for (const teacher of teacherUsers) {
+      teacherCourseAssignments.set(teacher.userId, (teacherCourseAssignments.get(teacher.userId) ?? [])
+        .filter((item) => item !== courseCode));
+    }
+    for (const teacherId of validTeacherIds) {
+      teacherCourseAssignments.get(teacherId)?.push(courseCode);
     }
   }
   const courseCodes = [...new Set([
     ...academicStudents.flatMap((student) => student.courseCodes),
-    ...academicTeachers.flatMap((teacher) => String(teacher.CourseCode ?? '').split('|').filter(Boolean))
+    ...academicTeachers.flatMap((teacher) => String(teacher.CourseCode ?? '').split('|').filter(Boolean)),
+    ...courseTeacherAssignments.keys()
   ])].sort();
   const studentIdBySourceId = new Map(academicStudents.map((student) => [student.sourceStudentId, student.studentId]));
   const teacherIdBySourceId = new Map(academicTeachers.map((teacher) => [teacher.sourceTeacherId, teacher.teacherId]));
@@ -130,7 +167,7 @@ export function createStore() {
   ]));
   const courseTeacherByStudent = new Map();
   for (const courseCode of courseCodes) {
-    const teachers = teachersByCourse.get(courseCode) ?? [];
+    const teachers = courseTeacherAssignments.get(courseCode) ?? [];
     const enrolledStudents = academicStudents.filter((student) => student.courseCodes.includes(courseCode));
     const studentAssignments = new Map();
     enrolledStudents.forEach((student, index) => {
@@ -178,7 +215,16 @@ export function createStore() {
     description: row.description,
     enabled: true
   }));
-  const runtime = readRuntimeData();
+  let gradeAuditLog = Array.isArray(runtime?.gradeAuditLog) ? runtime.gradeAuditLog : [];
+  let notifications = Array.isArray(runtime?.notifications) ? runtime.notifications : [];
+  let notificationReads = runtime?.notificationReads && typeof runtime.notificationReads === 'object'
+    ? runtime.notificationReads
+    : {};
+  const classManagement = runtime?.classManagement && typeof runtime.classManagement === 'object'
+    ? runtime.classManagement
+    : { enrollments: {}, courseTeachers: {} };
+  if (!classManagement.enrollments || typeof classManagement.enrollments !== 'object') classManagement.enrollments = {};
+  if (!classManagement.courseTeachers || typeof classManagement.courseTeachers !== 'object') classManagement.courseTeachers = {};
   const passwordOverrides = runtime?.passwordOverrides && typeof runtime.passwordOverrides === 'object'
     ? { ...runtime.passwordOverrides }
     : {};
@@ -188,7 +234,9 @@ export function createStore() {
     }
   }
   let submissions = Array.isArray(runtime?.submissions) ? runtime.submissions : createSeedSubmissions();
-  let rules = Array.isArray(runtime?.rules) ? runtime.rules : csvRules;
+  let rules = Array.isArray(runtime?.rules)
+    ? [...runtime.rules, ...csvRules.filter((rule) => !runtime.rules.some((stored) => stored.ruleCode === rule.ruleCode))]
+    : csvRules;
   let courseGrades = Array.isArray(runtime?.courseGrades) ? runtime.courseGrades : createCourseGrades();
   let assignments = Array.isArray(runtime?.assignments) ? runtime.assignments : [];
   for (const grade of courseGrades) {
@@ -208,7 +256,10 @@ export function createStore() {
   function persist() {
     fs.mkdirSync(runtimeDirectory, { recursive: true });
     const temporaryFile = `${runtimeFile}.tmp`;
-    fs.writeFileSync(temporaryFile, JSON.stringify({ submissions, rules, courseGrades, assignments, passwordOverrides }, null, 2), 'utf8');
+    fs.writeFileSync(temporaryFile, JSON.stringify({
+      submissions, rules, courseGrades, assignments, passwordOverrides, gradeAuditLog,
+      classManagement, profileOverrides, notifications, notificationReads
+    }, null, 2), 'utf8');
     fs.renameSync(temporaryFile, runtimeFile);
   }
 
@@ -216,6 +267,128 @@ export function createStore() {
     users,
     findUser(username) {
       return users.find((user) => user.username === username) ?? null;
+    },
+    findUserById(userId) {
+      return users.find((user) => user.userId === userId) ?? null;
+    },
+    updateUserProfile(userId, changes) {
+      const user = users.find((item) => item.userId === userId);
+      if (!user) return null;
+      Object.assign(user, changes);
+      const student = academicStudents.find((item) => item.studentId === userId);
+      if (student && changes.fullName) student.fullName = changes.fullName;
+      profileOverrides[userId] = { fullName: user.fullName, email: user.email };
+      persist();
+      return { userId, username: user.username, fullName: user.fullName, email: user.email, role: user.role };
+    },
+    updateUserPassword(userId, passwordHash) {
+      const user = users.find((item) => item.userId === userId);
+      if (!user) return false;
+      user.passwordHash = passwordHash;
+      passwordOverrides[userId] = passwordHash;
+      persist();
+      return true;
+    },
+    listStudents() {
+      return academicStudents.map((student) => ({ studentId: student.studentId, fullName: student.fullName, courseCodes: [...student.courseCodes] }));
+    },
+    listTeachers() {
+      return teacherUsers.map((teacher) => ({ userId: teacher.userId, fullName: teacher.fullName, email: teacher.email }));
+    },
+    listClassRoster(userId, courseCode) {
+      if (!(teacherCourseAssignments.get(userId) ?? []).includes(courseCode)) return null;
+      return academicStudents.filter((student) => student.courseCodes.includes(courseCode))
+        .map((student) => ({ studentId: student.studentId, fullName: student.fullName, email: users.find((user) => user.userId === student.studentId)?.email }));
+    },
+    listClassManagement(userId) {
+      return this.listCoursesForTeacher(userId).map((course) => ({
+        ...course,
+        teacherIds: [...(courseTeacherAssignments.get(course.courseCode) ?? [])],
+        roster: this.listClassRoster(userId, course.courseCode) ?? []
+      }));
+    },
+    updateEnrollment(userId, courseCode, studentId, enrolled) {
+      if (!(teacherCourseAssignments.get(userId) ?? []).includes(courseCode)) return null;
+      const student = academicStudents.find((item) => item.studentId === studentId);
+      if (!student) return false;
+      const enrolledNow = student.courseCodes.includes(courseCode);
+      if (enrolled && !enrolledNow) student.courseCodes.push(courseCode);
+      if (!enrolled && enrolledNow) student.courseCodes = student.courseCodes.filter((item) => item !== courseCode);
+      classManagement.enrollments[studentId] = [...student.courseCodes];
+      if (enrolled) {
+        const teachers = courseTeacherAssignments.get(courseCode) ?? [];
+        const rosterIndex = academicStudents.filter((item) => item.courseCodes.includes(courseCode)).indexOf(student);
+        if (teachers.length) courseTeacherByStudent.get(courseCode)?.set(studentId, teachers[rosterIndex % teachers.length]);
+      }
+      if (enrolled && !courseGrades.some((grade) => grade.studentId === studentId && grade.courseCode === courseCode && grade.semester === 'fall-2026')) {
+        const studentIndex = academicStudents.indexOf(student);
+        const courseIndex = courseCodes.indexOf(courseCode);
+        const totalScore = Number((4 + ((Math.round(student.gpa * 10) + studentIndex + courseIndex * 7) % 61) / 10).toFixed(1));
+        courseGrades.push({
+          studentId, studentName: student.fullName, courseCode, teacherId: assignedTeacher(courseCode, studentId),
+          semester: 'fall-2026', totalScore, deduction: Number((10 - totalScore).toFixed(1)),
+          gradingNotes: '', manualFeedback: '', updatedAt: null, active: true
+        });
+      }
+      if (!enrolled) courseGrades = courseGrades.filter((grade) => !(grade.studentId === studentId && grade.courseCode === courseCode));
+      persist();
+      return true;
+    },
+    updateCourseTeachers(userId, courseCode, teacherIds) {
+      if (!(teacherCourseAssignments.get(userId) ?? []).includes(courseCode)) return null;
+      if (!Array.isArray(teacherIds) || !teacherIds.length
+          || teacherIds.some((teacherId) => !teacherUsers.some((teacher) => teacher.userId === teacherId))) return false;
+      courseTeacherAssignments.set(courseCode, [...new Set(teacherIds)]);
+      for (const teacher of teacherUsers) {
+        const courses = teacherCourseAssignments.get(teacher.userId) ?? [];
+        teacherCourseAssignments.set(teacher.userId, courses.filter((item) => item !== courseCode));
+      }
+      for (const teacherId of courseTeacherAssignments.get(courseCode)) {
+        teacherCourseAssignments.get(teacherId)?.push(courseCode);
+      }
+      for (const student of academicStudents.filter((item) => item.courseCodes.includes(courseCode))) {
+        const teachers = courseTeacherAssignments.get(courseCode);
+        const index = academicStudents.filter((item) => item.courseCodes.includes(courseCode)).indexOf(student);
+        courseTeacherByStudent.get(courseCode)?.set(student.studentId, teachers[index % teachers.length]);
+      }
+      for (const grade of courseGrades.filter((item) => item.courseCode === courseCode)) {
+        grade.teacherId = assignedTeacher(courseCode, grade.studentId);
+      }
+      classManagement.courseTeachers[courseCode] = [...courseTeacherAssignments.get(courseCode)];
+      persist();
+      return true;
+    },
+    createNotification(userId, notification) {
+      const created = { notificationId: randomUUID(), userId, ...notification, createdAt: new Date().toISOString() };
+      notifications.unshift(created);
+      persist();
+      return created;
+    },
+    listNotifications(userId) {
+      const explicit = notifications.filter((item) => item.userId === userId).map((item) => ({
+        ...item, isRead: (notificationReads[userId] ?? []).includes(item.notificationId)
+      }));
+      const deadlines = this.listAssignmentsForStudent(userId)
+        .filter((assignment) => !assignment.closed && new Date(assignment.dueAt).getTime() > Date.now()
+          && new Date(assignment.dueAt).getTime() - Date.now() <= 48 * 60 * 60 * 1000)
+        .map((assignment) => ({
+          notificationId: `deadline:${assignment.assignmentId}`,
+          userId,
+          type: 'deadline',
+          title: `Deadline approaching: ${assignment.title}`,
+          message: `${assignment.courseCode} · Due ${assignment.dueAt}`,
+          createdAt: new Date().toISOString(),
+          isRead: (notificationReads[userId] ?? []).includes(`deadline:${assignment.assignmentId}`)
+        }));
+      return [...deadlines, ...explicit].sort((first, second) => new Date(second.createdAt) - new Date(first.createdAt));
+    },
+    markNotificationRead(userId, notificationId) {
+      const exists = this.listNotifications(userId).some((item) => item.notificationId === notificationId);
+      if (!exists) return false;
+      const reads = notificationReads[userId] ?? [];
+      if (!reads.includes(notificationId)) notificationReads[userId] = [...reads, notificationId];
+      persist();
+      return true;
     },
     resetPassword(email, confirmationKey, passwordHash) {
       const user = users.find((item) => item.email.trim().toLowerCase() === email
@@ -228,6 +401,13 @@ export function createStore() {
     },
     listSubmissions() {
       return [...submissions];
+    },
+    listSubmissionsForTeacher(userId) {
+      const teacherCourses = teacherCourseAssignments.get(userId) ?? [];
+      const students = new Set(academicStudents
+        .filter((student) => student.courseCodes.some((courseCode) => teacherCourses.includes(courseCode)))
+        .map((student) => student.studentId));
+      return submissions.filter((submission) => students.has(submission.userId));
     },
     listSubmissionsForUser(userId) {
       return submissions.filter((submission) => submission.userId === userId);
@@ -251,6 +431,18 @@ export function createStore() {
         .filter((assignment) => student.courseCodes.includes(assignment.courseCode))
         .map((assignment) => ({ ...assignment, isRead: assignment.readBy.includes(studentId) }));
     },
+    listStudentsForAssignment(userId, assignmentId) {
+      const assignment = this.findAssignmentForTeacher(userId, assignmentId);
+      if (!assignment) return null;
+      return academicStudents
+        .filter((student) => student.courseCodes.includes(assignment.courseCode))
+        .map((student) => ({
+          studentId: student.studentId,
+          fullName: student.fullName,
+          submission: submissions.find((submission) => submission.assignmentId === assignmentId
+            && submission.userId === student.studentId) ?? null
+        }));
+    },
     markAssignmentRead(studentId, assignmentId) {
       const student = academicStudents.find((item) => item.studentId === studentId);
       const assignment = assignments.find((item) => item.assignmentId === assignmentId);
@@ -266,7 +458,13 @@ export function createStore() {
     },
     listCoursesForTeacher(userId) {
       const teacher = teacherProfileByUser.get(userId);
-      return (teacherCourseAssignments.get(userId) ?? [])
+      const assignedCourses = teacherCourseAssignments.get(userId) ?? [];
+      const seedOrder = teacher?.courseCodes ?? [];
+      const orderedCourses = [
+        ...seedOrder.filter((courseCode) => assignedCourses.includes(courseCode)),
+        ...assignedCourses.filter((courseCode) => !seedOrder.includes(courseCode))
+      ];
+      return orderedCourses
         .map((courseCode) => ({
           courseCode,
           courseName: courseCode,
@@ -289,6 +487,9 @@ export function createStore() {
         && item.semester === semester && item.studentId === studentId && item.teacherId === teacher.teacherId);
       if (!grade) return null;
       Object.assign(grade, changes, { updatedAt: new Date().toISOString(), manuallyEdited: true });
+      this.createNotification(studentId, {
+        type: 'grade', title: 'Course grade updated', message: `${courseCode} · New score: ${grade.totalScore}`
+      });
       persist();
       return { ...grade };
     },
@@ -299,6 +500,9 @@ export function createStore() {
         && item.semester === semester && item.studentId === studentId && item.teacherId === teacher.teacherId);
       if (!grade) return null;
       grade.manualFeedback = manualFeedback;
+      this.createNotification(studentId, {
+        type: 'feedback', title: 'New teacher feedback', message: `${courseCode} · Your teacher added feedback.`
+      });
       persist();
       return { ...grade };
     },
@@ -314,6 +518,7 @@ export function createStore() {
         ...assignment,
         assignmentId: randomUUID(),
         teacherId: userId,
+        closed: false,
         readBy: [],
         createdAt: new Date().toISOString()
       };
@@ -349,18 +554,99 @@ export function createStore() {
         submissionId: submission.submissionId ?? `SUB-${randomUUID()}`,
         submittedAt: submission.submittedAt ?? new Date().toISOString()
       }, ...submissions];
+      if (submissions[0].score) {
+        this.createNotification(submissions[0].userId, {
+          type: 'grade', title: 'Submission analysis complete',
+          message: `${submissions[0].fileName} · Score: ${submissions[0].score.totalScore}`
+        });
+      }
       persist();
       return submissions[0];
     },
-    updateGrade(submissionId, grade) {
+    findSubmissionForTeacher(userId, submissionId) {
       const submission = this.findSubmission(submissionId);
       if (!submission) return null;
+      const teacherCourses = teacherCourseAssignments.get(userId) ?? [];
+      const student = academicStudents.find((item) => item.studentId === submission.userId);
+      if (!student || !student.courseCodes.some((courseCode) => teacherCourses.includes(courseCode))) return null;
+      if (submission.assignmentId) {
+        const assignment = assignments.find((item) => item.assignmentId === submission.assignmentId);
+        if (!assignment || assignment.teacherId !== userId || !teacherCourses.includes(assignment.courseCode)) return null;
+      } else if (!student.courseCodes.some((courseCode) => teacherCourses.includes(courseCode))) {
+        return null;
+      }
+      return submission;
+    },
+    findSimilarSubmissions(userId, assignmentId, minimumSimilarity = 0.35) {
+      const assignment = this.findAssignmentForTeacher(userId, assignmentId);
+      if (!assignment) return null;
+      const participants = submissions
+        .filter((submission) => submission.assignmentId === assignmentId && submission.sourceCode)
+        .map((submission) => ({
+          submission,
+          shingles: sourceShingles(submission.sourceCode),
+          studentName: users.find((user) => user.userId === submission.userId)?.fullName ?? 'Unknown student'
+        }));
+      const pairs = [];
+      for (let first = 0; first < participants.length; first += 1) {
+        for (let second = first + 1; second < participants.length; second += 1) {
+          if (participants[first].submission.userId === participants[second].submission.userId) continue;
+          const similarity = jaccardSimilarity(participants[first].shingles, participants[second].shingles);
+          if (similarity < minimumSimilarity) continue;
+          pairs.push({
+            first: {
+              submissionId: participants[first].submission.submissionId,
+              studentName: participants[first].studentName,
+              fileName: participants[first].submission.fileName
+            },
+            second: {
+              submissionId: participants[second].submission.submissionId,
+              studentName: participants[second].studentName,
+              fileName: participants[second].submission.fileName
+            },
+            similarity: Number((similarity * 100).toFixed(1))
+          });
+        }
+      }
+      return pairs.sort((first, second) => second.similarity - first.similarity);
+    },
+    listGradeAuditForSubmission(userId, submissionId) {
+      if (!this.findSubmissionForTeacher(userId, submissionId)) return null;
+      return gradeAuditLog.filter((entry) => entry.submissionId === submissionId).map((entry) => ({ ...entry }));
+    },
+    updateAnalysis(submissionId, analysis, score) {
+      const submission = this.findSubmission(submissionId);
+      if (!submission) return null;
+      submission.analysis = analysis;
+      submission.score = { ...score, updatedAt: new Date().toISOString(), manuallyEdited: false };
+      submission.status = analysis.syntaxValid ? 'Graded' : 'Needs Review';
+      this.createNotification(submission.userId, {
+        type: 'grade', title: 'Submission analysis complete', message: `${submission.fileName} · Score: ${submission.score.totalScore}`
+      });
+      persist();
+      return submission;
+    },
+    updateGrade(userId, submissionId, grade, reason) {
+      const submission = this.findSubmission(submissionId);
+      if (!submission) return null;
+      const previous = submission.score ? { ...submission.score } : null;
       submission.score = {
         ...submission.score,
         ...grade,
         updatedAt: new Date().toISOString(),
         manuallyEdited: true
       };
+      gradeAuditLog.unshift({
+        submissionId,
+        actorUserId: userId,
+        changedAt: submission.score.updatedAt,
+        reason,
+        previous,
+        next: { ...submission.score }
+      });
+      this.createNotification(submission.userId, {
+        type: 'grade', title: 'Submission grade updated', message: `${submission.fileName} · New score: ${submission.score.totalScore}`
+      });
       persist();
       return submission;
     },
@@ -368,6 +654,9 @@ export function createStore() {
       const submission = this.findSubmission(submissionId);
       if (!submission) return null;
       submission.manualFeedback = feedback;
+      this.createNotification(submission.userId, {
+        type: 'feedback', title: 'New teacher feedback', message: `${submission.fileName} · Your teacher added feedback.`
+      });
       persist();
       return submission;
     },
@@ -381,10 +670,15 @@ export function createStore() {
       persist();
       return rule;
     },
-    createClassReport() {
-      const students = users.filter((user) => user.role.toLowerCase() === 'student');
+    createClassReport(userId) {
+      const teacherCourses = new Set(teacherCourseAssignments.get(userId) ?? []);
+      const teacherSubmissions = this.listSubmissionsForTeacher(userId);
+      const studentIds = new Set(academicStudents
+        .filter((student) => student.courseCodes.some((courseCode) => teacherCourses.has(courseCode)))
+        .map((student) => student.studentId));
+      const students = users.filter((user) => user.role.toLowerCase() === 'student' && studentIds.has(user.userId));
       const reportRows = students.map((student) => {
-        const studentSubmissions = submissions.filter((submission) => submission.userId === student.userId);
+        const studentSubmissions = teacherSubmissions.filter((submission) => submission.userId === student.userId);
         const graded = studentSubmissions.filter((submission) => Number.isFinite(submission.score?.totalScore));
         const average = graded.length
           ? graded.reduce((sum, submission) => sum + submission.score.totalScore, 0) / graded.length
@@ -403,14 +697,48 @@ export function createStore() {
         };
       });
       const allScores = reportRows.flatMap((row) => row.scores.map((item) => item.score));
+      const violationCounts = new Map();
+      for (const submission of teacherSubmissions) {
+        for (const violation of submission.analysis?.violations ?? []) {
+          const code = violation.ruleCode || violation.ruleName || 'Unknown';
+          const current = violationCounts.get(code) ?? { ruleCode: code, count: 0 };
+          current.count += 1;
+          violationCounts.set(code, current);
+        }
+      }
+      const teacherAssignments = assignments.filter((assignment) => assignment.teacherId === userId);
+      const assignmentRosters = teacherAssignments.map((assignment) => {
+        const roster = academicStudents.filter((student) => student.courseCodes.includes(assignment.courseCode));
+        const submitted = roster.filter((student) => teacherSubmissions.some((submission) => submission.assignmentId === assignment.assignmentId
+          && submission.userId === student.studentId));
+        return {
+          assignmentId: assignment.assignmentId,
+          title: assignment.title,
+          courseCode: assignment.courseCode,
+          enrolledCount: roster.length,
+          submittedCount: submitted.length,
+          submissionRate: roster.length ? Number((submitted.length / roster.length * 100).toFixed(1)) : 0
+        };
+      });
+      const distribution = [
+        { range: '0-4.9', min: 0, max: 4.9 },
+        { range: '5-5.9', min: 5, max: 5.9 },
+        { range: '6-6.9', min: 6, max: 6.9 },
+        { range: '7-7.9', min: 7, max: 7.9 },
+        { range: '8-8.9', min: 8, max: 8.9 },
+        { range: '9-10', min: 9, max: 10 }
+      ].map(({ range, min, max }) => ({ range, count: allScores.filter((score) => score >= min && score <= max).length }));
 
       return {
         studentCount: students.length,
-        submissionCount: submissions.length,
+        submissionCount: teacherSubmissions.length,
         gradedSubmissionCount: allScores.length,
         classAverage: allScores.length
           ? Number((allScores.reduce((sum, score) => sum + score, 0) / allScores.length).toFixed(2))
           : null,
+        scoreDistribution: distribution,
+        mostCommonViolations: [...violationCounts.values()].sort((first, second) => second.count - first.count).slice(0, 5),
+        assignmentRosters,
         students: reportRows
       };
     }

@@ -136,3 +136,28 @@ test('each enrolled course has a distinct demo score for the student', () => {
   assert.equal(courseGrades.length, student.CourseCode.split('|').length);
   assert.equal(new Set(courseGrades.map((grade) => grade.totalScore)).size, courseGrades.length);
 });
+
+test('rule engine detects missing comments, long methods, and duplicate method bodies', async () => {
+  process.env.AI_PROVIDER = 'disabled';
+  const source = `public class Review {
+  public int first() {
+    int total = 0;
+${'    total += 1;\n'.repeat(42)}    return total;
+  }
+  public int second() {
+    int total = 0;
+${'    total += 1;\n'.repeat(42)}    return total;
+  }
+}`;
+  const rules = [
+    { ruleCode: 'COMMENT', ruleName: 'Missing comment', severity: 'Low', penaltyPoints: 0.5, enabled: true },
+    { ruleCode: 'LONG_METHOD', ruleName: 'Long method', severity: 'Medium', penaltyPoints: 1, enabled: true },
+    { ruleCode: 'DUPLICATE_CODE', ruleName: 'Duplicate code', severity: 'Medium', penaltyPoints: 1.5, enabled: true }
+  ];
+  const result = await analyzeJavaSource(source, rules);
+  assert.equal(result.syntaxValid, true);
+  assert.ok(result.violations.some((finding) => finding.ruleCode === 'COMMENT' && finding.lineNumber === 2));
+  assert.ok(result.violations.some((finding) => finding.ruleCode === 'LONG_METHOD' && finding.lineNumber === 2));
+  assert.ok(result.violations.some((finding) => finding.ruleCode === 'DUPLICATE_CODE' && finding.lineNumber > 2));
+  assert.ok(result.totalScore < 10);
+});

@@ -157,6 +157,39 @@ textarea { min-height: 110px; resize: vertical; }
 .assignment-actions { display: flex; min-width: 245px; flex-wrap: wrap; gap: 5px; }
 .assignment-actions .button { padding: 7px 8px; font-size: 10px; }
 #assignment-form .button-secondary { margin-left: 8px; }
+.class-tabs { display: flex; gap: 18px; margin: 20px 0 8px; border-bottom: 1px solid var(--line); }
+.class-tab { display: inline-flex; align-items: center; gap: 8px; margin-bottom: -1px; border: 0; border-bottom: 2px solid transparent; padding: 11px 4px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; }
+.class-tab.active { border-bottom-color: var(--forest); color: var(--forest-dark); }
+.class-tab span { color: inherit; font: 10px "DM Mono", Consolas, monospace; }
+.course-fixed-value { margin: 0; border: 1px solid var(--line); padding: 11px 12px; background: #f7faf7; color: var(--muted); font-size: 13px; }
+.teacher-choice-grid { display: grid; max-height: 420px; overflow-y: auto; gap: 4px; border: 1px solid var(--line); padding: 8px; background: #f8faf8; }
+.check-option { display: flex; min-height: 38px; align-items: center; gap: 10px; border: 1px solid transparent; padding: 7px 9px; background: var(--surface); cursor: pointer; }
+.check-option:hover, .check-option:focus-within { border-color: #9aafa2; background: #f1f7f1; }
+.check-option input[type="checkbox"] { flex: 0 0 16px; width: 16px; height: 16px; margin: 0; padding: 0; accent-color: var(--forest); cursor: pointer; }
+.check-option span { min-width: 0; font-size: 12px; }
+.check-option small { margin-left: 5px; color: var(--muted); font: 10px "DM Mono", Consolas, monospace; }
+.inline-form .field-label { flex: 1 1 300px; }
+.submission-toolbar, .report-actions { display: flex; justify-content: flex-end; margin: 14px 0; }
+.source-code { overflow: auto; max-height: 560px; margin: 16px 0; border: 1px solid var(--line); padding: 18px; background: #17231f; color: #e8f0e9; font: 12px/1.65 "DM Mono", Consolas, monospace; white-space: pre; }
+.finding pre { overflow: auto; margin: 8px 0 0; border-left: 2px solid var(--coral); padding: 7px 10px; background: #f7f5f1; font: 11px/1.5 "DM Mono", Consolas, monospace; white-space: pre; }
+.finding p { margin: 8px 0 0; color: var(--muted); }
+.teacher-review-grid, .report-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.teacher-review-grid .content-form { width: 100%; }
+.teacher-review-grid h3 { margin: 0 0 15px; font-size: 15px; }
+.report-grid { margin: 24px 0; }
+.distribution-list { display: grid; gap: 11px; border: 1px solid var(--line); padding: 16px; background: var(--surface); }
+.distribution-row { display: grid; grid-template-columns: 55px minmax(70px, 1fr) 28px; gap: 10px; align-items: center; font: 11px "DM Mono", Consolas, monospace; }
+.distribution-track { height: 9px; overflow: hidden; background: #e8eee8; }
+.distribution-track span { display: block; height: 100%; background: var(--coral); }
+.distribution-row strong { text-align: right; }
+.audit-list { display: grid; gap: 8px; }
+.audit-list article { display: grid; grid-template-columns: minmax(130px, 1fr) auto; gap: 4px 12px; border-left: 3px solid var(--forest); padding: 12px 14px; background: var(--surface); font-size: 12px; }
+.audit-list time { color: var(--muted); font: 10px "DM Mono", Consolas, monospace; }
+.audit-list p { grid-column: 1 / -1; margin: 0; color: var(--muted); }
+.attachment-list { display: grid; gap: 8px; }
+.attachment-list article { display: flex; justify-content: space-between; align-items: center; gap: 14px; border: 1px solid var(--line); padding: 13px 15px; background: var(--surface); }
+.attachment-list strong { font-size: 13px; overflow-wrap: anywhere; }
+.attachment-list p { margin: 4px 0 0; color: var(--muted); font-size: 11px; }
 
 @media (max-width: 850px) {
   .login-layout { grid-template-columns: 1fr  minmax(300px, .8fr); gap: 32px; }
@@ -198,6 +231,7 @@ textarea { min-height: 110px; resize: vertical; }
   .metric { min-height: 96px; padding: 12px; }
   .metric strong { font-size: 23px; }
   .field-row { grid-template-columns: 1fr; }
+  .teacher-review-grid, .report-grid { grid-template-columns: 1fr; }
   .rule-row { grid-template-columns: 1fr 100px; gap: 10px; }
   .rule-row .rule-enabled { grid-column: 1 / -1; }
 }

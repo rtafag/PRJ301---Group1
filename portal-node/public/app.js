@@ -13,7 +13,18 @@ const state = {
   selectedAssignmentId: null,
   assignments: [],
   assignmentCourseCode: null,
-  editingAssignmentId: null
+  editingAssignmentId: null,
+  selectedTeacherAssignmentId: null,
+  plagiarismAssignmentId: null,
+  selectedTeacherSubmissionId: null,
+  teacherSubmission: null,
+  classes: [],
+  allStudents: [],
+  allTeachers: [],
+  selectedClassCode: null,
+  selectedClassTab: 'students',
+  profile: null,
+  notifications: []
 };
 const loginScreen = document.querySelector('#login-screen');
 const portalScreen = document.querySelector('#portal-screen');
@@ -30,11 +41,16 @@ const studentNavigation = [
 ];
 const teacherNavigation = [
   ['dashboard', 'Overview'],
+  ['submissions', 'Submissions'],
+  ['plagiarism', 'Code similarity'],
+  ['reports', 'Reports'],
   ['rules', 'Rule Engine'],
   ['edit-grade', 'Edit Grades'],
   ['feedback', 'Manual Feedback'],
-  ['assignments', 'Assignments']
+  ['classes', 'Classes'],
+  ['settings', 'Account settings']
 ];
+studentNavigation.push(['settings', 'Account settings']);
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -110,6 +126,49 @@ function metric(label, value) {
 
 function emptyState(message) {
   return `<div class="empty-state">${escapeHtml(message)}</div>`;
+}
+
+function renderAccountSettings(profile) {
+  return `<div class="settings-grid">
+    <form id="profile-form" class="content-form"><h2>Profile</h2>
+      <label class="field-label">Full name<input name="fullName" maxlength="120" value="${escapeHtml(profile.fullName)}" required></label>
+      <label class="field-label">Email<input name="email" type="email" value="${escapeHtml(profile.email)}" required></label>
+      <button class="button button-primary" type="submit">Save profile</button>
+    </form>
+    <form id="password-form" class="content-form"><h2>Change password</h2>
+      <label class="field-label">Current password<input name="currentPassword" type="password" autocomplete="current-password" required></label>
+      <label class="field-label">New password<input name="newPassword" type="password" minlength="8" maxlength="128" autocomplete="new-password" required></label>
+      <label class="field-label">Confirm new password<input name="confirmPassword" type="password" minlength="8" autocomplete="new-password" required></label>
+      <button class="button button-primary" type="submit">Update password</button>
+    </form>
+  </div>`;
+}
+
+function renderTeacherClasses(classes, students, teachers, selectedCode) {
+  const selectedClass = classes.find((course) => course.courseCode === selectedCode) ?? classes[0];
+  if (!selectedClass) return emptyState('No classes are assigned to this account.');
+  state.selectedClassCode = selectedClass.courseCode;
+  const classOptions = classes.map((course) => `<option value="${escapeHtml(course.courseCode)}" ${course.courseCode === selectedClass.courseCode ? 'selected' : ''}>${escapeHtml(course.courseCode)} · ${escapeHtml(course.courseName)}</option>`).join('');
+  const assignedTeachers = new Set(selectedClass.teacherIds);
+  const teacherChoices = teachers.map((teacher) => `<label class="check-option"><input type="checkbox" name="teacherIds" value="${escapeHtml(teacher.userId)}" ${assignedTeachers.has(teacher.userId) ? 'checked' : ''}><span>${escapeHtml(teacher.fullName)} <small>${escapeHtml(teacher.userId)}</small></span></label>`).join('');
+  const enrolled = new Set(selectedClass.roster.map((student) => student.studentId));
+  const studentChoices = students.filter((student) => !enrolled.has(student.studentId))
+    .map((student) => `<option value="${escapeHtml(student.studentId)}">${escapeHtml(student.fullName)} · ${escapeHtml(student.studentId)}</option>`).join('');
+  const rosterRows = selectedClass.roster.map((student) => `<tr><td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.studentId)}</td><td>${escapeHtml(student.email ?? '—')}</td><td><button class="button button-danger" type="button" data-remove-student="${escapeHtml(student.studentId)}">Remove</button></td></tr>`).join('');
+  const tabBar = `<div class="class-tabs" role="tablist" aria-label="Course management">
+    <button class="class-tab ${state.selectedClassTab === 'students' ? 'active' : ''}" type="button" data-class-tab="students">Students <span>${selectedClass.roster.length}</span></button>
+    <button class="class-tab ${state.selectedClassTab === 'assignments' ? 'active' : ''}" type="button" data-class-tab="assignments">Assignments</button>
+  </div>`;
+  const classContent = state.selectedClassTab === 'assignments'
+    ? renderTeacherAssignments(selectedClass.courseCode)
+    : `<div class="section-heading"><h2>Enrollment</h2><p>${selectedClass.roster.length} students</p></div>
+      <form id="class-teachers-form" class="content-form" data-course-code="${escapeHtml(selectedClass.courseCode)}"><h3>Assigned teachers</h3><div class="teacher-choice-grid">${teacherChoices}</div><button class="button button-primary" type="submit">Save teacher assignments</button></form>
+      <div class="section-heading"><h2>Students</h2><p>Roster changes are saved separately from the seed CSV</p></div>
+      <form id="enroll-student-form" class="inline-form" data-course-code="${escapeHtml(selectedClass.courseCode)}"><label class="field-label">Add student<select name="studentId" required><option value="">Choose a student</option>${studentChoices}</select></label><button class="button button-primary" type="submit" ${studentChoices ? '' : 'disabled'}>Enroll</button></form>
+      ${rosterRows ? `<div class="table-wrap"><table><thead><tr><th>Student</th><th>ID</th><th>Email</th><th></th></tr></thead><tbody>${rosterRows}</tbody></table></div>` : emptyState('This class has no enrolled students.')}`;
+  return `<div class="content-form class-selector"><label class="field-label">Class / course<select id="class-course-select">${classOptions}</select></label></div>
+    <div class="section-heading"><h2>${escapeHtml(selectedClass.courseCode)} · ${escapeHtml(selectedClass.courseName)}</h2><p>${selectedClass.teacherIds.length} assigned teachers</p></div>
+    ${tabBar}${classContent}`;
 }
 
 function submissionRows(submissions, includeStudent = false) {
@@ -229,37 +288,123 @@ function renderTeacherCourseFeedback(course, grades) {
     </form>`;
 }
 
-function renderTeacherAssignments() {
+function renderTeacherAssignmentRoster(assignment, students) {
+  const rows = students.map((student) => `<tr>
+    <td>${escapeHtml(student.fullName)}</td><td>${escapeHtml(student.studentId)}</td>
+    <td>${student.submitted ? '<span class="pill">Submitted</span>' : '<span class="pill warn">Not submitted</span>'}${student.late ? ' <span class="pill warn">Late</span>' : ''}</td>
+    <td>${formatDateTime(student.submittedAt)}</td>
+    <td>${student.submission ? formatScore(student.submission.score?.totalScore) : '—'}</td>
+    <td>${student.submission ? `<button class="button button-secondary" type="button" data-review-submission="${escapeHtml(student.submission.submissionId)}">Open</button>` : '—'}</td>
+  </tr>`).join('');
+  const submittedCount = students.filter((student) => student.submitted).length;
+  return `<div class="course-grade-heading"><div><button class="button button-secondary" type="button" data-back-to-submission-list>Assignments</button><p class="eyebrow">${escapeHtml(assignment.courseCode)}</p><h2>${escapeHtml(assignment.title)}</h2><p>Due ${formatDateTime(assignment.dueAt)} · ${submittedCount}/${students.length} submitted</p></div></div>
+    ${rows ? `<div class="table-wrap"><table><thead><tr><th>Student</th><th>ID</th><th>Status</th><th>Submitted</th><th>Score</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : emptyState('No students are enrolled in this course.')}`;
+}
+
+function renderTeacherSubmissionList(submissions) {
+  const rows = [...submissions]
+    .sort((first, second) => new Date(second.submittedAt) - new Date(first.submittedAt))
+    .map((submission) => `<tr>
+      <td>${escapeHtml(submission.studentName)}</td>
+      <td>${escapeHtml(submission.fileName || submission.submissionId)}</td>
+      <td>${submission.assignmentId ? escapeHtml(state.assignments.find((item) => item.assignmentId === submission.assignmentId)?.title ?? 'Assignment') : 'Practice upload'}</td>
+      <td><span class="pill ${submission.status === 'Needs Review' ? 'warn' : ''}">${escapeHtml(submission.status)}</span></td>
+      <td class="score">${formatScore(submission.score?.totalScore)}</td>
+      <td>${formatDateTime(submission.submittedAt)}</td>
+      <td><button class="button button-secondary" type="button" data-review-submission="${escapeHtml(submission.submissionId)}">Open</button></td>
+    </tr>`).join('');
+  return `<div class="section-heading"><h2>All submissions</h2><p>${submissions.length} from students in your courses</p></div>
+    ${rows ? `<div class="table-wrap"><table><thead><tr><th>Student</th><th>File</th><th>Assignment</th><th>Status</th><th>Score</th><th>Submitted</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : emptyState('No students in your courses have submitted work yet.')}`;
+}
+
+function renderTeacherSubmissionDetail(submission, auditEntries) {
+  const sourceLines = String(submission.sourceCode ?? '').split('\n');
+  const findings = submission.analysis?.violations ?? [];
+  const findingRows = findings.map((finding) => {
+    const lineNumber = Number(finding.lineNumber);
+    return `<article class="finding"><strong>${escapeHtml(finding.ruleCode || finding.ruleName)}</strong><span>Line ${escapeHtml(lineNumber)}${finding.severity ? ` · ${escapeHtml(finding.severity)}` : ''}</span><pre>${escapeHtml(sourceLines[lineNumber - 1] ?? '')}</pre><p>${escapeHtml(finding.suggestedFix)}</p></article>`;
+  }).join('');
+  return `<div class="section-heading"><div><p class="eyebrow">${escapeHtml(submission.studentName)} · ${escapeHtml(submission.submissionId)}</p><h2>${escapeHtml(submission.fileName)}</h2></div><button class="button button-secondary" type="button" data-back-to-submission-roster>Back to roster</button></div>
+    <p class="assignment-course-label">Submitted ${formatDateTime(submission.submittedAt)} · Score ${formatScore(submission.score?.totalScore)} · ${escapeHtml(submission.status)}</p>
+    <div class="submission-toolbar"><button class="button button-secondary" type="button" data-download-submission="${escapeHtml(submission.submissionId)}" data-owner="teacher">Download original</button>${submission.fileName.toLowerCase().endsWith('.java') ? `<button class="button button-primary" type="button" data-analyze-submission="${escapeHtml(submission.submissionId)}">Run analysis</button>` : ''}</div>
+    <div class="analysis-list"><section class="analysis-entry"><div class="section-heading"><h2>Rule violations</h2><span class="pill">${findings.length} findings</span></div>${findingRows || emptyState('No configured rule violations found.')}</section></div>
+    ${submission.sourceCode !== null && submission.sourceCode !== undefined ? `<pre class="source-code">${escapeHtml(submission.sourceCode)}</pre>` : `<p class="notice">This file type is stored as an original attachment. Download it to view the contents.</p>`}
+    <div class="teacher-review-grid">
+      ${submission.fileName.toLowerCase().endsWith('.java') ? `<form id="submission-grade-form" class="content-form" data-submission-id="${escapeHtml(submission.submissionId)}">
+        <h3>Edit grade</h3><label class="field-label">Score<input name="totalScore" type="number" min="0" max="10" step="0.1" value="${escapeHtml(submission.score?.totalScore ?? 0)}" required></label>
+        <label class="field-label">Deduction<input name="deduction" type="number" min="0" max="10" step="0.1" value="${escapeHtml(submission.score?.deduction ?? 0)}" required></label>
+        <label class="field-label">Reason for change<input name="reason" maxlength="500" required></label>
+        <label class="field-label">Grading notes<textarea name="gradingNotes" maxlength="2000">${escapeHtml(submission.score?.gradingNotes ?? '')}</textarea></label>
+        <button class="button button-primary" type="submit">Save grade</button>
+      </form>` : ''}
+      <form id="submission-feedback-form" class="content-form" data-submission-id="${escapeHtml(submission.submissionId)}">
+        <h3>Manual feedback</h3><label class="field-label">Feedback<textarea name="feedback" maxlength="4000" required>${escapeHtml(submission.manualFeedback ?? '')}</textarea></label>
+        <button class="button button-primary" type="submit">Save feedback</button>
+      </form>
+    </div>
+    <div class="section-heading"><h2>Grade history</h2><p>${auditEntries.length} manual changes</p></div>
+    ${auditEntries.length ? `<div class="audit-list">${auditEntries.map((entry) => `<article><strong>${escapeHtml(entry.actorName)}</strong><time>${formatDateTime(entry.changedAt)}</time><p>${escapeHtml(entry.previous?.totalScore ?? '—')} → ${escapeHtml(entry.next.totalScore)} · ${escapeHtml(entry.reason || 'No reason entered')}</p></article>`).join('')}</div>` : emptyState('No grade changes have been recorded.')}`;
+}
+
+  function renderTeacherPlagiarism(assignments, selectedAssignmentId, pairs) {
+    const options = assignments.map((assignment) => `<option value="${escapeHtml(assignment.assignmentId)}" ${assignment.assignmentId === selectedAssignmentId ? 'selected' : ''}>${escapeHtml(assignment.courseCode)} · ${escapeHtml(assignment.title)}</option>`).join('');
+    const rows = pairs.map((pair) => `<tr><td>${escapeHtml(pair.first.studentName)}<small class="assignment-description">${escapeHtml(pair.first.fileName)}</small></td><td>${escapeHtml(pair.second.studentName)}<small class="assignment-description">${escapeHtml(pair.second.fileName)}</small></td><td class="score">${pair.similarity}%</td><td><button class="button button-secondary" type="button" data-review-submission="${escapeHtml(pair.first.submissionId)}">Review first</button> <button class="button button-secondary" type="button" data-review-submission="${escapeHtml(pair.second.submissionId)}">Review second</button></td></tr>`).join('');
+    return `<div class="content-form"><label class="field-label" for="plagiarism-assignment">Assignment</label><select id="plagiarism-assignment">${options}</select></div>
+    <div class="section-heading"><h2>Potentially similar submissions</h2><p>Token-shingle similarity is a review signal, not a finding of misconduct.</p></div>
+    ${rows ? `<div class="table-wrap"><table><thead><tr><th>Student A</th><th>Student B</th><th>Similarity</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : emptyState('No submission pairs crossed the similarity threshold for this assignment.')}`;
+  }
+
+function renderTeacherReport(report) {
+  const assignmentRoster = report.assignmentRosters ?? [];
+  const totalEnrolled = assignmentRoster.reduce((sum, item) => sum + item.enrolledCount, 0);
+  const totalSubmitted = assignmentRoster.reduce((sum, item) => sum + item.submittedCount, 0);
+  const submissionRate = totalEnrolled ? `${(totalSubmitted / totalEnrolled * 100).toFixed(1)}%` : '—';
+  const maxBucket = Math.max(1, ...(report.scoreDistribution ?? []).map((item) => item.count));
+  const buckets = (report.scoreDistribution ?? []).map((item) => `<div class="distribution-row"><span>${escapeHtml(item.range)}</span><div class="distribution-track"><span style="width:${item.count / maxBucket * 100}%"></span></div><strong>${item.count}</strong></div>`).join('');
+  const commonRules = (report.mostCommonViolations ?? []).map((item) => `<tr><td>${escapeHtml(item.ruleCode)}</td><td>${item.count}</td></tr>`).join('');
+  const assignments = assignmentRoster.map((item) => `<tr><td>${escapeHtml(item.courseCode)}</td><td>${escapeHtml(item.title)}</td><td>${item.submittedCount}/${item.enrolledCount}</td><td>${item.submissionRate}%</td></tr>`).join('');
+  return `<div class="report-actions"><button id="export-grades-csv" class="button button-secondary" type="button">Export grades CSV</button><button id="export-grades-xlsx" class="button button-primary" type="button">Export Excel</button></div>
+    <div class="metric-grid">${metric('Class average', report.classAverage === null ? '—' : formatScore(report.classAverage))}${metric('Submissions', report.submissionCount)}${metric('Graded', report.gradedSubmissionCount)}${metric('Submission rate', submissionRate)}</div>
+    <div class="report-grid"><section><div class="section-heading"><h2>Score distribution</h2></div><div class="distribution-list">${buckets || emptyState('No scores yet.')}</div></section>
+      <section><div class="section-heading"><h2>Most common violations</h2></div>${commonRules ? `<div class="table-wrap"><table><thead><tr><th>Rule</th><th>Count</th></tr></thead><tbody>${commonRules}</tbody></table></div>` : emptyState('No rule violations recorded.')}</section></div>
+    <div class="section-heading"><h2>Assignment submission rates</h2></div>${assignments ? `<div class="table-wrap"><table><thead><tr><th>Course</th><th>Assignment</th><th>Submitted</th><th>Rate</th></tr></thead><tbody>${assignments}</tbody></table></div>` : emptyState('No assignment data yet.')}`;
+}
+
+function renderTeacherAssignments(courseCode = null) {
   const selectedAssignment = state.assignments.find((assignment) => assignment.assignmentId === state.editingAssignmentId);
   if (state.editingAssignmentId && !selectedAssignment) state.editingAssignmentId = null;
-  const defaultCourse = state.courses.some((course) => course.courseCode === state.assignmentCourseCode)
+  const defaultCourse = courseCode ?? (state.courses.some((course) => course.courseCode === state.assignmentCourseCode)
     ? state.assignmentCourseCode
-    : selectedAssignment?.courseCode ?? state.courses[0]?.courseCode ?? '';
+    : selectedAssignment?.courseCode ?? state.courses[0]?.courseCode ?? '');
   state.assignmentCourseCode = defaultCourse;
-  const courseOptions = state.courses.map((course) => `<option value="${escapeHtml(course.courseCode)}" ${course.courseCode === (selectedAssignment?.courseCode ?? defaultCourse) ? 'selected' : ''}>${escapeHtml(course.courseCode)}</option>`).join('');
-  const assignmentRows = [...state.assignments].sort((first, second) => new Date(first.dueAt) - new Date(second.dueAt)).map((assignment) => `
+  const courseOptions = courseCode
+    ? `<input type="hidden" name="courseCode" value="${escapeHtml(courseCode)}"><p class="course-fixed-value">${escapeHtml(courseCode)}</p>`
+    : `<select name="courseCode" required>${state.courses.map((course) => `<option value="${escapeHtml(course.courseCode)}" ${course.courseCode === (selectedAssignment?.courseCode ?? defaultCourse) ? 'selected' : ''}>${escapeHtml(course.courseCode)}</option>`).join('')}</select>`;
+  const assignmentRows = [...state.assignments].filter((assignment) => !courseCode || assignment.courseCode === courseCode).sort((first, second) => new Date(first.dueAt) - new Date(second.dueAt)).map((assignment) => `
     <tr>
       <td>${escapeHtml(assignment.courseCode)}</td>
       <td><strong>${escapeHtml(assignment.title)}</strong><small class="assignment-description">${escapeHtml(assignment.description || '')}</small></td>
       <td>${formatDateTime(assignment.dueAt)}</td>
       <td><span class="pill ${assignment.status === 'Expired' ? 'warn' : ''}">${escapeHtml(assignment.status)}</span></td>
       <td><div class="assignment-actions">
+        <button class="button button-secondary" type="button" data-review-assignment="${escapeHtml(assignment.assignmentId)}">Submissions</button>
+        <button class="button button-secondary" type="button" data-toggle-assignment="${escapeHtml(assignment.assignmentId)}" data-closed="${Boolean(assignment.closed)}">${assignment.closed ? 'Reopen' : 'Close'}</button>
         <button class="button button-secondary" type="button" data-edit-assignment="${escapeHtml(assignment.assignmentId)}">Edit</button>
         <button class="button button-danger" type="button" data-delete-assignment="${escapeHtml(assignment.assignmentId)}">Delete</button>
       </div></td>
     </tr>`).join('');
   const formTitle = selectedAssignment ? 'Edit assignment' : 'Create assignment';
-  return `<div class="section-heading"><h2>Assignments</h2><p>Create homework and manage deadlines</p></div>
+  return `<div class="section-heading"><h2>${courseCode ? `${escapeHtml(courseCode)} assignments` : 'Assignments'}</h2><p>Create homework and manage deadlines</p></div>
     <form id="assignment-form" class="content-form">
       <input type="hidden" name="assignmentId" value="${escapeHtml(selectedAssignment?.assignmentId ?? '')}">
-      <label class="field-label">Course<select name="courseCode" required>${courseOptions}</select></label>
+      <label class="field-label">Course${courseOptions}</label>
       <label class="field-label">Title<input name="title" maxlength="120" value="${escapeHtml(selectedAssignment?.title ?? '')}" required></label>
       <label class="field-label">Description<textarea name="description" maxlength="4000">${escapeHtml(selectedAssignment?.description ?? '')}</textarea></label>
       <label class="field-label">Due date and time<input name="dueAt" type="datetime-local" value="${toLocalDateTime(selectedAssignment?.dueAt)}" required></label>
       <button class="button button-primary" type="submit">${formTitle}</button>
       ${selectedAssignment ? '<button id="cancel-assignment-edit" class="button button-secondary" type="button">Cancel</button>' : ''}
     </form>
-    <div class="section-heading"><h2>Assignment list</h2><p>${state.assignments.length} assignments</p></div>
+    <div class="section-heading"><h2>Assignment list</h2><p>${state.assignments.filter((assignment) => !courseCode || assignment.courseCode === courseCode).length} assignments</p></div>
     ${assignmentRows ? `<div class="table-wrap"><table class="assignment-table"><thead><tr><th>Course</th><th>Assignment</th><th>Due</th><th>Status</th><th>Actions</th></tr></thead><tbody>${assignmentRows}</tbody></table></div>` : emptyState('No assignments yet.')}`;
 }
 
@@ -274,16 +419,17 @@ function studentCourseGradeTable(courseGrades) {
   return `<div class="table-wrap"><table><thead><tr><th>Course</th><th>Score</th><th>Deduction</th><th>Teacher feedback</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
-function renderStudentNotifications(assignments) {
+function renderStudentNotifications(assignments, notifications) {
   const unreadAssignments = assignments.filter((assignment) => !assignment.isRead);
-  const notifications = unreadAssignments.map((assignment) => `
+  const assignmentItems = unreadAssignments.map((assignment) => `
     <article class="student-notification">
       <div><strong>New assignment in ${escapeHtml(assignment.courseCode)}: ${escapeHtml(assignment.title)}</strong><p>Due ${formatDateTime(assignment.dueAt)} · ${escapeHtml(assignment.status)}</p></div>
       <button class="button button-secondary" type="button" data-view-student-assignment="${escapeHtml(assignment.assignmentId)}">View assignment</button>
     </article>`).join('');
   return `<section class="student-notifications">
     <div class="student-notifications-heading"><h2>Notifications</h2><span>${unreadAssignments.length} new</span></div>
-    ${notifications || emptyState('No new assignments.')}
+    ${notifications.filter((item) => !item.isRead).map((item) => `<article class="student-notification"><div><strong>${escapeHtml(item.title)}</strong><p>${escapeHtml(item.message)}</p></div><button class="button button-secondary" type="button" data-read-notification="${escapeHtml(item.notificationId)}">Mark read</button></article>`).join('')}
+    ${assignmentItems || emptyState('No new assignments.')}
     <button class="text-action" type="button" data-view="assignments">View all assignments</button>
   </section>`;
 }
@@ -344,12 +490,13 @@ function renderStudentAssignments(assignments) {
 
 async function renderStudentView() {
   if (state.view === 'dashboard') {
-    const [coursePayload, gradePayload, assignmentPayload] = await Promise.all([
-      api('/api/student/courses'), api('/api/student/course-grades'), api('/api/student/assignments')
+    const [coursePayload, gradePayload, assignmentPayload, notificationPayload] = await Promise.all([
+      api('/api/student/courses'), api('/api/student/course-grades'), api('/api/student/assignments'), api('/api/me/notifications')
     ]);
     state.courses = coursePayload.courses;
     state.semesters = coursePayload.semesters;
     state.studentAssignments = assignmentPayload.assignments;
+    state.notifications = notificationPayload.notifications;
     if (!state.semesters.some((semester) => semester.value === state.selectedSemester)) {
       state.selectedSemester = state.semesters[0]?.value ?? '';
     }
@@ -357,7 +504,7 @@ async function renderStudentView() {
       state.selectedCourseCode = null;
     }
     const selectedCourse = state.courses.find((course) => course.courseCode === state.selectedCourseCode);
-    const notifications = renderStudentNotifications(state.studentAssignments);
+    const notifications = renderStudentNotifications(state.studentAssignments, state.notifications);
     return `${notifications}${selectedCourse
       ? renderStudentCourseGrades(selectedCourse, gradePayload.courseGrades)
       : renderStudentCoursePicker()}`;
@@ -377,12 +524,16 @@ async function renderStudentView() {
   const courseGrades = courseGradePayload.courseGrades;
 
   if (state.view === 'submit') {
-    return `<div class="section-heading"><h2>Submit Java source code</h2><p>Java files only · 512 KB maximum</p></div>
+    state.studentAssignments = (await api('/api/student/assignments')).assignments;
+    const assignmentOptions = state.studentAssignments.map((assignment) => `<option value="${escapeHtml(assignment.assignmentId)}" ${assignment.status === 'Closed' ? 'disabled' : ''}>${escapeHtml(assignment.courseCode)} · ${escapeHtml(assignment.title)} · ${escapeHtml(assignment.status)}</option>`).join('');
+    return `<div class="section-heading"><h2>Submit a file</h2><p>Any file type · 512 KB maximum</p></div>
       <form id="upload-form" class="content-form">
+        <label class="field-label" for="submission-assignment">Assignment</label>
+        <select id="submission-assignment" name="assignmentId"><option value="">Unassigned practice upload</option>${assignmentOptions}</select>
         <label class="field-label" for="source-file">Source file</label>
-        <input id="source-file" name="sourceFile" type="file" accept=".java,text/x-java" required>
-        <p class="login-note">The portal calculates a SHA-256 hash, parses Java syntax and applies enabled rules. Code is not executed unless the Docker sandbox is enabled.</p>
-        <button class="button button-primary" type="submit">Submit and analyze</button>
+        <input id="source-file" name="sourceFile" type="file" required>
+        <p class="login-note">Java files are checked by the rule engine. Other file types are stored as submitted and can be downloaded by your teacher. Maximum size: 512 KB.</p>
+        <button class="button button-primary" type="submit">Submit file</button>
       </form>`;
   }
 
@@ -393,12 +544,19 @@ async function renderStudentView() {
   }
 
   if (state.view === 'history') {
-    return `<div class="section-heading"><h2>Submission history</h2><p>${state.submissions.length} records</p></div>${table(['File', 'Submission ID', 'Status', 'Score', 'Submitted'], state.submissions)}`;
+    const rows = state.submissions.map((submission) => `<tr><td>${escapeHtml(submission.fileName)}</td><td>${escapeHtml(submission.submissionId)}</td><td>${escapeHtml(submission.status)}</td><td>${formatScore(submission.score?.totalScore)}</td><td>${formatDate(submission.submittedAt)}</td><td><button class="button button-secondary" type="button" data-download-submission="${escapeHtml(submission.submissionId)}" data-owner="student">Download</button></td></tr>`).join('');
+    return `<div class="section-heading"><h2>Submission history</h2><p>${state.submissions.length} records</p></div>${rows ? `<div class="table-wrap"><table><thead><tr><th>File</th><th>Submission ID</th><th>Status</th><th>Score</th><th>Submitted</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : emptyState('No submissions yet.')}`;
   }
 
   const analyses = state.submissions.filter((submission) => submission.analysis);
-  if (!analyses.length) return `<div class="section-heading"><h2>Analysis &amp; fixes</h2></div>${emptyState('Analysis results will appear after you submit Java source code.')}`;
+  const attachments = state.submissions.filter((submission) => !submission.analysis);
+  if (!analyses.length && !attachments.length) return `<div class="section-heading"><h2>Analysis &amp; fixes</h2></div>${emptyState('Analysis results will appear after you submit Java source code.')}`;
+  if (!analyses.length) {
+    return `<div class="section-heading"><h2>Submitted files</h2><p>Java files receive automatic analysis. Other file types are stored as attachments.</p></div>
+      <div class="attachment-list">${attachments.map((submission) => `<article><div><strong>${escapeHtml(submission.fileName)}</strong><p>Submitted ${formatDateTime(submission.submittedAt)} · ${escapeHtml(submission.status)}</p></div><button class="button button-secondary" type="button" data-download-submission="${escapeHtml(submission.submissionId)}" data-owner="student">Download</button></article>`).join('')}</div>`;
+  }
   return `<div class="section-heading"><h2>Analysis &amp; fixes</h2><p>Static analysis results for your submissions</p></div>
+    ${attachments.length ? `<div class="section-heading"><h2>Other submitted files</h2></div><div class="attachment-list">${attachments.map((submission) => `<article><div><strong>${escapeHtml(submission.fileName)}</strong><p>Submitted ${formatDateTime(submission.submittedAt)} · ${escapeHtml(submission.status)}</p></div><button class="button button-secondary" type="button" data-download-submission="${escapeHtml(submission.submissionId)}" data-owner="student">Download</button></article>`).join('')}</div>` : ''}
     <div class="analysis-list">${analyses.map((submission) => `
       <section class="analysis-entry">
         <div class="section-heading"><h2>${escapeHtml(submission.fileName)}</h2><span class="pill ${submission.analysis.syntaxValid ? '' : 'warn'}">${submission.analysis.syntaxValid ? 'Syntax valid' : 'Needs review'}</span></div>
@@ -411,6 +569,54 @@ async function renderStudentView() {
 }
 
 async function renderTeacherView() {
+    if (state.view === 'classes') {
+      const [payload, assignmentPayload] = await Promise.all([
+        api('/api/teacher/classes'), api('/api/teacher/assignments')
+      ]);
+      state.classes = payload.classes;
+      state.allStudents = payload.students;
+      state.allTeachers = payload.teachers;
+      state.assignments = assignmentPayload.assignments;
+      return renderTeacherClasses(state.classes, state.allStudents, state.allTeachers, state.selectedClassCode);
+    }
+
+  if (state.view === 'submissions') {
+    const [assignmentPayload, submissionPayload] = await Promise.all([
+      api('/api/teacher/assignments'), api('/api/teacher/submissions')
+    ]);
+    state.assignments = assignmentPayload.assignments;
+    if (state.selectedTeacherSubmissionId) {
+      const payload = await api(`/api/teacher/submissions/${encodeURIComponent(state.selectedTeacherSubmissionId)}`);
+      state.teacherSubmission = payload.submission;
+      const auditPayload = await api(`/api/teacher/submissions/${encodeURIComponent(state.selectedTeacherSubmissionId)}/audit`);
+      return renderTeacherSubmissionDetail(state.teacherSubmission, auditPayload.entries);
+    }
+    if (state.selectedTeacherAssignmentId) {
+      const payload = await api(`/api/teacher/assignments/${encodeURIComponent(state.selectedTeacherAssignmentId)}/submissions`);
+      return renderTeacherAssignmentRoster(payload.assignment, payload.students);
+    }
+    const rows = state.assignments.map((assignment) => `<tr><td>${escapeHtml(assignment.courseCode)}</td><td>${escapeHtml(assignment.title)}</td><td>${formatDateTime(assignment.dueAt)}</td><td>${escapeHtml(assignment.status)}</td><td><button class="button button-secondary" type="button" data-review-assignment="${escapeHtml(assignment.assignmentId)}">View roster</button></td></tr>`).join('');
+    return `${renderTeacherSubmissionList(submissionPayload.submissions)}
+      <div class="section-heading"><h2>Assignments</h2><p>${state.assignments.length} assignments</p></div>
+      ${rows ? `<div class="table-wrap"><table><thead><tr><th>Course</th><th>Assignment</th><th>Deadline</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : emptyState('Create an assignment to track submissions by student.')}`;
+  }
+
+  if (state.view === 'plagiarism') {
+    const assignmentPayload = await api('/api/teacher/assignments');
+    state.assignments = assignmentPayload.assignments;
+    if (!state.assignments.some((assignment) => assignment.assignmentId === state.plagiarismAssignmentId)) {
+      state.plagiarismAssignmentId = state.assignments[0]?.assignmentId ?? null;
+    }
+    if (!state.plagiarismAssignmentId) return emptyState('Create an assignment and collect submissions to compare code.');
+    const payload = await api(`/api/teacher/assignments/${encodeURIComponent(state.plagiarismAssignmentId)}/similar-submissions`);
+    return renderTeacherPlagiarism(state.assignments, state.plagiarismAssignmentId, payload.pairs);
+  }
+
+  if (state.view === 'reports') {
+    const payload = await api('/api/teacher/report');
+    return renderTeacherReport(payload.report);
+  }
+
   if (state.view === 'dashboard' || state.view === 'edit-grade' || state.view === 'feedback') {
     const coursePayload = await api('/api/teacher/courses');
     state.courses = coursePayload.courses;
@@ -457,15 +663,22 @@ async function renderView() {
   const titles = {
     dashboard: 'Overview', submit: 'Submit Source Code', grades: 'My Grades', history: 'Submission History',
     analysis: 'Analysis & Fixes', rules: 'Rule Engine', 'edit-grade': 'Edit Grades', feedback: 'Manual Feedback',
-    assignments: 'Assignments'
+    assignments: 'Assignments', submissions: 'Submissions', plagiarism: 'Code similarity', reports: 'Reports',
+    classes: 'Classes', settings: 'Account settings'
   };
   document.querySelector('#view-title').textContent = titles[state.view] || 'Workspace';
   document.querySelector('#view-kicker').textContent = `${state.user.role.toUpperCase()} WORKSPACE`;
   workspace.innerHTML = '<p class="loading">Loading workspace data...</p>';
   try {
-    workspace.innerHTML = state.user.role.toLowerCase() === 'student'
-      ? await renderStudentView()
-      : await renderTeacherView();
+    if (state.view === 'settings') {
+      const payload = await api('/api/me');
+      state.profile = payload.user;
+      workspace.innerHTML = renderAccountSettings(state.profile);
+    } else {
+      workspace.innerHTML = state.user.role.toLowerCase() === 'student'
+        ? await renderStudentView()
+        : await renderTeacherView();
+    }
   } catch (error) {
     workspace.innerHTML = `<div class="notice">${escapeHtml(error.message)}</div>`;
   }
@@ -548,6 +761,14 @@ document.querySelector('#main-nav').addEventListener('click', (event) => {
 });
 
 workspace.addEventListener('click', async (event) => {
+  const classTab = event.target.closest('[data-class-tab]');
+  if (classTab) {
+    state.selectedClassTab = classTab.dataset.classTab;
+    state.editingAssignmentId = null;
+    renderView();
+    return;
+  }
+
   const semesterButton = event.target.closest('[data-semester]');
   if (semesterButton) {
     state.selectedSemester = semesterButton.dataset.semester;
@@ -555,7 +776,7 @@ workspace.addEventListener('click', async (event) => {
     return;
   }
 
-  const courseButton = event.target.closest('[data-course-code]');
+  const courseButton = event.target.closest('.course-card[data-course-code]');
   if (courseButton) {
     state.selectedCourseCode = courseButton.dataset.courseCode;
     renderView();
@@ -565,6 +786,31 @@ workspace.addEventListener('click', async (event) => {
   if (event.target.closest('#back-to-courses')) {
     state.selectedCourseCode = null;
     renderView();
+    return;
+  }
+
+  const removeStudent = event.target.closest('[data-remove-student]');
+  if (removeStudent) {
+    try {
+      await api(`/api/teacher/classes/${encodeURIComponent(state.selectedClassCode)}/enrollments/${encodeURIComponent(removeStudent.dataset.removeStudent)}`, {
+        method: 'PATCH', body: JSON.stringify({ enrolled: false })
+      });
+      showToast('Student removed from class.');
+      await renderView();
+    } catch (error) {
+      showToast(error.message);
+    }
+    return;
+  }
+
+  const readNotification = event.target.closest('[data-read-notification]');
+  if (readNotification) {
+    try {
+      await api(`/api/me/notifications/${encodeURIComponent(readNotification.dataset.readNotification)}/read`, { method: 'PATCH' });
+      await renderView();
+    } catch (error) {
+      showToast(error.message);
+    }
     return;
   }
 
@@ -600,6 +846,87 @@ workspace.addEventListener('click', async (event) => {
   if (editAssignment) {
     state.editingAssignmentId = editAssignment.dataset.editAssignment;
     renderView();
+    return;
+  }
+
+  const reviewAssignment = event.target.closest('[data-review-assignment]');
+  if (reviewAssignment) {
+    state.selectedTeacherAssignmentId = reviewAssignment.dataset.reviewAssignment;
+    state.selectedTeacherSubmissionId = null;
+    state.view = 'submissions';
+    renderView();
+    return;
+  }
+
+  const reviewSubmission = event.target.closest('[data-review-submission]');
+  if (reviewSubmission) {
+    state.selectedTeacherSubmissionId = reviewSubmission.dataset.reviewSubmission;
+    renderView();
+    return;
+  }
+
+  if (event.target.closest('[data-back-to-submission-list]')) {
+    state.selectedTeacherAssignmentId = null;
+    renderView();
+    return;
+  }
+
+  if (event.target.closest('[data-back-to-submission-roster]')) {
+    state.selectedTeacherSubmissionId = null;
+    renderView();
+    return;
+  }
+
+  const analyzeButton = event.target.closest('[data-analyze-submission]');
+  if (analyzeButton) {
+    analyzeButton.disabled = true;
+    try {
+      await api(`/api/teacher/submissions/${encodeURIComponent(analyzeButton.dataset.analyzeSubmission)}/analyze`, { method: 'POST' });
+      showToast('Analysis completed and score updated.');
+      await renderView();
+    } catch (error) {
+      showToast(error.message);
+    }
+    return;
+  }
+
+  const downloadButton = event.target.closest('[data-download-submission]');
+  if (downloadButton) {
+    const owner = downloadButton.dataset.owner;
+    const endpoint = owner === 'teacher' ? '/api/teacher' : '/api/student';
+    try {
+      const response = await fetch(`${endpoint}/submissions/${encodeURIComponent(downloadButton.dataset.downloadSubmission)}/file`, {
+        headers: { Authorization: `Bearer ${state.token}` }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(payload?.error || 'Could not download submitted file.');
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') ?? '';
+      const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+      const fileName = encodedName ? decodeURIComponent(encodedName) : 'submission-file';
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fileName;
+      link.click();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      showToast(error.message);
+    }
+    return;
+  }
+
+  const toggleAssignment = event.target.closest('[data-toggle-assignment]');
+  if (toggleAssignment) {
+    try {
+      await api(`/api/teacher/assignments/${encodeURIComponent(toggleAssignment.dataset.toggleAssignment)}`, {
+        method: 'PATCH', body: JSON.stringify({ closed: toggleAssignment.dataset.closed !== 'true' })
+      });
+      showToast(toggleAssignment.dataset.closed === 'true' ? 'Assignment reopened.' : 'Assignment closed.');
+      await renderView();
+    } catch (error) {
+      showToast(error.message);
+    }
     return;
   }
 
@@ -646,7 +973,34 @@ workspace.addEventListener('click', async (event) => {
   }
 
   if (event.target.closest('#print-report')) window.print();
+  if (event.target.closest('#export-grades-csv')) {
+    try {
+      await downloadTeacherExport('/api/teacher/report.csv', 'teacher-grades.csv');
+    } catch (error) {
+      showToast(error.message);
+    }
+    return;
+  }
+  if (event.target.closest('#export-grades-xlsx')) {
+    try {
+      await downloadTeacherExport('/api/teacher/report.xlsx', 'teacher-grades.xlsx');
+    } catch (error) {
+      showToast(error.message);
+    }
+  }
 });
+
+async function downloadTeacherExport(url, fileName) {
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${state.token}` } });
+  if (!response.ok) throw new Error('Could not export grades.');
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  link.click();
+  URL.revokeObjectURL(objectUrl);
+}
 
 workspace.addEventListener('input', (event) => {
   if (event.target.id !== 'course-search') return;
@@ -657,6 +1011,16 @@ workspace.addEventListener('input', (event) => {
 });
 
 workspace.addEventListener('change', (event) => {
+  if (event.target.id === 'class-course-select') {
+    state.selectedClassCode = event.target.value;
+    renderView();
+    return;
+  }
+  if (event.target.id === 'plagiarism-assignment') {
+    state.plagiarismAssignmentId = event.target.value;
+    renderView();
+    return;
+  }
   if (event.target.id === 'feedback-course') {
     state.selectedCourseCode = event.target.value;
     state.selectedStudentId = null;
@@ -696,6 +1060,48 @@ workspace.addEventListener('submit', async (event) => {
   const form = event.target;
   event.preventDefault();
   try {
+    if (form.id === 'profile-form') {
+      const values = Object.fromEntries(new FormData(form));
+      const result = await api('/api/me/profile', { method: 'PATCH', body: JSON.stringify(values) });
+      state.profile = result.user;
+      state.user = { ...state.user, fullName: result.user.fullName };
+      document.querySelector('#account-name').textContent = result.user.fullName;
+      document.querySelector('#account-initial').textContent = result.user.fullName.slice(0, 1).toUpperCase();
+      showToast('Profile saved.');
+      await renderView();
+      return;
+    }
+
+    if (form.id === 'password-form') {
+      const values = Object.fromEntries(new FormData(form));
+      if (values.newPassword !== values.confirmPassword) throw new Error('Passwords do not match.');
+      await api('/api/me/password', { method: 'PATCH', body: JSON.stringify(values) });
+      form.reset();
+      showToast('Password updated.');
+      return;
+    }
+
+    if (form.id === 'class-teachers-form') {
+      const values = new FormData(form);
+      const teacherIds = values.getAll('teacherIds');
+      await api(`/api/teacher/classes/${encodeURIComponent(form.dataset.courseCode)}/teachers`, {
+        method: 'PATCH', body: JSON.stringify({ teacherIds })
+      });
+      showToast('Teacher assignments saved.');
+      await renderView();
+      return;
+    }
+
+    if (form.id === 'enroll-student-form') {
+      const values = new FormData(form);
+      await api(`/api/teacher/classes/${encodeURIComponent(form.dataset.courseCode)}/enrollments/${encodeURIComponent(values.get('studentId'))}`, {
+        method: 'PATCH', body: JSON.stringify({ enrolled: true })
+      });
+      showToast('Student enrolled.');
+      await renderView();
+      return;
+    }
+
     if (form.id === 'upload-form') {
       const result = await api('/api/student/submissions', { method: 'POST', body: new FormData(form) });
       showToast(`Submitted ${result.submission.fileName}.`);
@@ -733,6 +1139,26 @@ workspace.addEventListener('submit', async (event) => {
         })
       });
       state.selectedStudentId = values.studentId;
+      showToast('Manual feedback saved.');
+      await renderView();
+      return;
+    }
+
+    if (form.id === 'submission-grade-form') {
+      const values = Object.fromEntries(new FormData(form));
+      await api(`/api/teacher/submissions/${encodeURIComponent(form.dataset.submissionId)}/grade`, {
+        method: 'PATCH', body: JSON.stringify(values)
+      });
+      showToast('Submission grade saved.');
+      await renderView();
+      return;
+    }
+
+    if (form.id === 'submission-feedback-form') {
+      const values = Object.fromEntries(new FormData(form));
+      await api(`/api/teacher/submissions/${encodeURIComponent(form.dataset.submissionId)}/feedback`, {
+        method: 'PATCH', body: JSON.stringify(values)
+      });
       showToast('Manual feedback saved.');
       await renderView();
       return;

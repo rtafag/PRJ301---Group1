@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import crypto from 'node:crypto';
 import express from 'express';
+import ExcelJS from 'exceljs';
 import helmet from 'helmet';
 import multer from 'multer';
 import path from 'node:path';
@@ -32,16 +33,28 @@ app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(portalDirectory, 'public')));
 
 function publicSubmission(submission) {
-  const { sourceCode, ...visible } = submission;
+  const { sourceCode, fileData, ...visible } = submission;
   return visible;
+}
+
+function isJavaFile(fileName) {
+  return path.extname(fileName).toLowerCase() === '.java';
+}
+
+function isTextFile(fileName, mimeType) {
+  return mimeType.startsWith('text/') || /\.(?:java|js|ts|py|rb|php|html?|css|xml|json|ya?ml|md|sql|c|h|cc|cpp|hpp|cs|sh|bat|ps1)$/i.test(fileName);
 }
 
 function publicAssignment(assignment) {
   const { readBy, ...visible } = assignment;
-  return {
-    ...visible,
-    status: new Date(assignment.dueAt).getTime() <= Date.now() ? 'Expired' : 'Active'
+   return {
+     ...visible,
+     status: assignment.closed ? 'Closed' : new Date(assignment.dueAt).getTime() <= Date.now() ? 'Expired' : 'Active'
   };
+}
+
+function csvCell(value) {
+  return `"${String(value ?? '').replaceAll('"', '""')}"`;
 }
 
 function getOwnedSubmission(request, response) {
@@ -86,21 +99,64 @@ app.post('/api/auth/logout', requireAuth(auth), (request, response) => {
 });
 
 app.get('/api/me', requireAuth(auth), (request, response) => {
-  response.json({ user: request.user });
+  const { passwordHash, ...user } = store.findUserById(request.user.userId);
+  response.json({ user });
+});
+
+app.patch('/api/me/profile', requireAuth(auth), (request, response) => {
+  const fullName = String(request.body?.fullName ?? '').trim();
+  const email = String(request.body?.email ?? '').trim().toLowerCase();
+  if (!fullName || fullName.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return response.status(400).json({ error: 'Enter a name under 120 characters and a valid email address.' });
+  }
+  if (store.users.some((user) => user.userId !== request.user.userId && user.email.toLowerCase() === email)) {
+    return response.status(409).json({ error: 'This email address is already used by another account.' });
+  }
+  return response.json({ user: store.updateUserProfile(request.user.userId, { fullName, email }) });
+});
+
+app.patch('/api/me/password', requireAuth(auth), (request, response) => {
+  const { currentPassword, newPassword } = request.body ?? {};
+  if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
+    return response.status(400).json({ error: 'New password must contain 8 to 128 characters.' });
+  }
+  if (!auth.changePassword({ userId: request.user.userId, currentPassword, newPassword })) {
+    return response.status(400).json({ error: 'Current password is incorrect.' });
+  }
+  return response.json({ message: 'Password updated.' });
+});
+
+app.get('/api/me/notifications', requireAuth(auth), (request, response) => {
+  return response.json({ notifications: store.listNotifications(request.user.userId) });
+});
+
+app.patch('/api/me/notifications/:notificationId/read', requireAuth(auth), (request, response) => {
+  if (!store.markNotificationRead(request.user.userId, request.params.notificationId)) {
+    return response.status(404).json({ error: 'Notification not found.' });
+  }
+  return response.status(204).end();
 });
 
 app.post('/api/student/submissions', studentOnly, (request, response, next) => {
   upload.single('sourceFile')(request, response, (error) => {
     if (error) return next(error);
-    if (!request.file) return response.status(400).json({ error: 'Choose a Java source file.' });
+    if (!request.file) return response.status(400).json({ error: 'Choose a file to submit.' });
 
     const fileName = path.basename(request.file.originalname);
-    if (!/^[A-Za-z_$][A-Za-z0-9_$]*\.java$/.test(fileName)) {
-      return response.status(400).json({ error: 'Upload one .java file with a valid Java filename.' });
+    if (!fileName || fileName.length > 255 || /[\u0000-\u001f]/.test(fileName)) {
+      return response.status(400).json({ error: 'File name is invalid or exceeds 255 characters.' });
     }
 
-    const sourceCode = request.file.buffer.toString('utf8');
-    const fileHash = sha256(sourceCode);
+    const javaFile = isJavaFile(fileName);
+    const mimeType = request.file.mimetype || 'application/octet-stream';
+    const sourceCode = isTextFile(fileName, mimeType) ? request.file.buffer.toString('utf8') : null;
+    const assignmentId = String(request.body?.assignmentId ?? '').trim();
+    const assignment = assignmentId
+      ? store.listAssignmentsForStudent(request.user.userId).find((item) => item.assignmentId === assignmentId)
+      : null;
+    if (assignmentId && !assignment) return response.status(404).json({ error: 'Assignment not found for your courses.' });
+    if (assignment?.closed) return response.status(409).json({ error: 'This assignment is closed and no longer accepts submissions.' });
+    const fileHash = crypto.createHash('sha256').update(request.file.buffer).digest('hex');
     const duplicate = store.findSubmissionByHash(fileHash);
     if (duplicate) {
       const message = duplicate.userId === request.user.userId
@@ -110,36 +166,55 @@ app.post('/api/student/submissions', studentOnly, (request, response, next) => {
     }
 
     const startedAt = Date.now();
-    analyzeJavaSource(sourceCode, store.listRules()).then((analysis) => {
+    const analysisPromise = javaFile
+      ? analyzeJavaSource(sourceCode, store.listRules())
+      : Promise.resolve(null);
+    analysisPromise.then((analysis) => {
+      const score = analysis ? {
+        totalScore: analysis.totalScore,
+        deduction: analysis.deduction,
+        gradingNotes: analysis.violations.length ? 'Rule engine findings are available for review.' : 'No configured rule violations found.',
+        updatedAt: new Date().toISOString(),
+        manuallyEdited: false
+      } : null;
       const submission = store.createSubmission({
         submissionId: `SUB-${crypto.randomUUID()}`,
         userId: request.user.userId,
+        assignmentId: assignment?.assignmentId ?? null,
         fileName,
+        mimeType,
+        fileData: request.file.buffer.toString('base64'),
         fileUrl: `local://${request.user.userId}/${fileName}`,
         fileHash,
         sourceCode,
-        status: analysis.syntaxValid ? 'Graded' : 'Needs Review',
-        score: {
-          totalScore: analysis.totalScore,
-          deduction: analysis.deduction,
-          gradingNotes: analysis.violations.length ? 'Rule engine findings are available for review.' : 'No configured rule violations found.',
-          updatedAt: new Date().toISOString(),
-          manuallyEdited: false
-        },
-        analysis: {
+        status: analysis ? (analysis.syntaxValid ? 'Graded' : 'Needs Review') : 'Submitted',
+        score,
+        analysis: analysis ? {
           astJson: analysis.astSummary,
           aiFeedback: analysis.aiFeedback,
           providerWarning: analysis.providerWarning,
           syntaxValid: analysis.syntaxValid,
           executionTimeMs: Date.now() - startedAt,
           violations: analysis.violations
-        },
+        } : null,
         manualFeedback: ''
       });
 
       return response.status(201).json({ submission: publicSubmission(submission) });
     }).catch(next);
   });
+});
+
+app.get('/api/student/submissions/:submissionId/file', studentOnly, (request, response) => {
+  const submission = getOwnedSubmission(request, response);
+  if (!submission) return;
+  if (!submission.fileData) return response.status(404).json({ error: 'Original file is not available.' });
+  const bytes = Buffer.from(submission.fileData, 'base64');
+  response.setHeader('Content-Type', submission.mimeType || 'application/octet-stream');
+  response.setHeader('Content-Length', bytes.length);
+  response.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(submission.fileName)}`);
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  return response.send(bytes);
 });
 
 app.get('/api/student/submissions', studentOnly, (request, response) => {
@@ -192,6 +267,9 @@ app.get('/api/student/submissions/:submissionId', studentOnly, (request, respons
 app.post('/api/student/submissions/:submissionId/run', studentOnly, async (request, response, next) => {
   const submission = getOwnedSubmission(request, response);
   if (!submission) return;
+  if (!isJavaFile(submission.fileName)) {
+    return response.status(415).json({ error: 'The Java sandbox only accepts .java submissions.' });
+  }
   if (!submission.sourceCode) {
     return response.status(409).json({ error: 'Source code is not available for this sample submission.' });
   }
@@ -205,7 +283,7 @@ app.post('/api/student/submissions/:submissionId/run', studentOnly, async (reque
 
 app.get('/api/teacher/submissions', teacherOnly, (request, response) => {
   const students = new Map(store.users.map((user) => [user.userId, user.fullName]));
-  const submissions = store.listSubmissions().map((submission) => ({
+  const submissions = store.listSubmissionsForTeacher(request.user.userId).map((submission) => ({
     ...publicSubmission(submission),
     studentName: students.get(submission.userId) ?? 'Unknown student'
   }));
@@ -217,6 +295,29 @@ app.get('/api/teacher/courses', teacherOnly, (request, response) => {
     courses: store.listCoursesForTeacher(request.user.userId),
     semesters: store.listSemesters()
   });
+});
+
+app.get('/api/teacher/classes', teacherOnly, (request, response) => {
+  return response.json({
+    classes: store.listClassManagement(request.user.userId),
+    teachers: store.listTeachers(),
+    students: store.listStudents()
+  });
+});
+
+app.patch('/api/teacher/classes/:courseCode/enrollments/:studentId', teacherOnly, (request, response) => {
+  if (typeof request.body?.enrolled !== 'boolean') return response.status(400).json({ error: 'Enrolled must be a boolean.' });
+  const result = store.updateEnrollment(request.user.userId, request.params.courseCode, request.params.studentId, request.body.enrolled);
+  if (result === null) return response.status(403).json({ error: 'This course is not assigned to your account.' });
+  if (!result) return response.status(404).json({ error: 'Student not found.' });
+  return response.status(204).end();
+});
+
+app.patch('/api/teacher/classes/:courseCode/teachers', teacherOnly, (request, response) => {
+  const result = store.updateCourseTeachers(request.user.userId, request.params.courseCode, request.body?.teacherIds);
+  if (result === null) return response.status(403).json({ error: 'This course is not assigned to your account.' });
+  if (!result) return response.status(400).json({ error: 'Assign at least one valid teacher.' });
+  return response.json({ courseCode: request.params.courseCode, teacherIds: request.body.teacherIds });
 });
 
 app.get('/api/teacher/course-grades', teacherOnly, (request, response) => {
@@ -271,6 +372,90 @@ app.get('/api/teacher/assignments', teacherOnly, (request, response) => {
   return response.json({ assignments });
 });
 
+app.get('/api/teacher/assignments/:assignmentId/submissions', teacherOnly, (request, response) => {
+  const assignment = store.findAssignmentForTeacher(request.user.userId, request.params.assignmentId);
+  if (!assignment) return response.status(404).json({ error: 'Assignment not found.' });
+  const students = store.listStudentsForAssignment(request.user.userId, assignment.assignmentId).map((student) => {
+    const submission = student.submission;
+    return {
+      studentId: student.studentId,
+      fullName: student.fullName,
+      submitted: Boolean(submission),
+      submittedAt: submission?.submittedAt ?? null,
+      late: Boolean(submission && new Date(submission.submittedAt).getTime() > new Date(assignment.dueAt).getTime()),
+      submission: submission ? {
+        submissionId: submission.submissionId,
+        fileName: submission.fileName,
+        status: submission.status,
+        score: submission.score,
+        analysis: submission.analysis
+      } : null
+    };
+  });
+  return response.json({ assignment: publicAssignment(assignment), students });
+});
+
+app.get('/api/teacher/assignments/:assignmentId/similar-submissions', teacherOnly, (request, response) => {
+  const pairs = store.findSimilarSubmissions(request.user.userId, request.params.assignmentId);
+  if (!pairs) return response.status(404).json({ error: 'Assignment not found.' });
+  return response.json({ pairs });
+});
+
+app.get('/api/teacher/submissions/:submissionId', teacherOnly, (request, response) => {
+  const submission = store.findSubmissionForTeacher(request.user.userId, request.params.submissionId);
+  if (!submission) return response.status(404).json({ error: 'Submission not found.' });
+  const student = store.users.find((user) => user.userId === submission.userId);
+  const { fileData, ...visibleSubmission } = submission;
+  return response.json({ submission: { ...visibleSubmission, studentName: student?.fullName ?? 'Unknown student' } });
+});
+
+app.get('/api/teacher/submissions/:submissionId/file', teacherOnly, (request, response) => {
+  const submission = store.findSubmissionForTeacher(request.user.userId, request.params.submissionId);
+  if (!submission) return response.status(404).json({ error: 'Submission not found.' });
+  if (!submission.fileData) return response.status(404).json({ error: 'Original file is not available.' });
+  const bytes = Buffer.from(submission.fileData, 'base64');
+  response.setHeader('Content-Type', submission.mimeType || 'application/octet-stream');
+  response.setHeader('Content-Length', bytes.length);
+  response.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(submission.fileName)}`);
+  response.setHeader('X-Content-Type-Options', 'nosniff');
+  return response.send(bytes);
+});
+
+app.get('/api/teacher/submissions/:submissionId/audit', teacherOnly, (request, response) => {
+  const entries = store.listGradeAuditForSubmission(request.user.userId, request.params.submissionId);
+  if (!entries) return response.status(404).json({ error: 'Submission not found.' });
+  const names = new Map(store.users.map((user) => [user.userId, user.fullName]));
+  return response.json({ entries: entries.map((entry) => ({ ...entry, actorName: names.get(entry.actorUserId) ?? entry.actorUserId })) });
+});
+
+app.post('/api/teacher/submissions/:submissionId/analyze', teacherOnly, async (request, response, next) => {
+  const submission = store.findSubmissionForTeacher(request.user.userId, request.params.submissionId);
+  if (!submission) return response.status(404).json({ error: 'Submission not found.' });
+  if (!isJavaFile(submission.fileName)) {
+    return response.status(415).json({ error: 'The rule engine only analyzes .java submissions.' });
+  }
+  if (!submission.sourceCode) return response.status(409).json({ error: 'Source code is not available for this submission.' });
+  try {
+    const startedAt = Date.now();
+    const analysis = await analyzeJavaSource(submission.sourceCode, store.listRules());
+    const updated = store.updateAnalysis(submission.submissionId, {
+      astJson: analysis.astSummary,
+      aiFeedback: analysis.aiFeedback,
+      providerWarning: analysis.providerWarning,
+      syntaxValid: analysis.syntaxValid,
+      executionTimeMs: Date.now() - startedAt,
+      violations: analysis.violations
+    }, {
+      totalScore: analysis.totalScore,
+      deduction: analysis.deduction,
+      gradingNotes: analysis.violations.length ? 'Rule engine findings are available for review.' : 'No configured rule violations found.'
+    });
+    return response.json({ submission: updated });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.post('/api/teacher/assignments', teacherOnly, (request, response) => {
   const title = String(request.body?.title ?? '').trim();
   const courseCode = String(request.body?.courseCode ?? '').trim();
@@ -304,11 +489,15 @@ app.patch('/api/teacher/assignments/:assignmentId', teacherOnly, (request, respo
   if (!store.listCoursesForTeacher(request.user.userId).some((course) => course.courseCode === courseCode)) {
     return response.status(403).json({ error: 'This course is not assigned to your account.' });
   }
+  if (request.body?.closed !== undefined && typeof request.body.closed !== 'boolean') {
+    return response.status(400).json({ error: 'Closed must be a boolean.' });
+  }
   const assignment = store.updateAssignment(request.user.userId, request.params.assignmentId, {
     title,
     courseCode,
     description,
-    dueAt: dueAt.toISOString()
+    dueAt: dueAt.toISOString(),
+    closed: request.body?.closed ?? existing.closed ?? false
   });
   return response.json({ assignment: publicAssignment(assignment) });
 });
@@ -321,7 +510,66 @@ app.delete('/api/teacher/assignments/:assignmentId', teacherOnly, (request, resp
 });
 
 app.get('/api/teacher/report', teacherOnly, (request, response) => {
-  response.json({ report: store.createClassReport() });
+   response.json({ report: store.createClassReport(request.user.userId) });
+});
+
+app.get('/api/teacher/report.csv', teacherOnly, (request, response) => {
+  const students = new Map(store.users.map((user) => [user.userId, user.fullName]));
+  const rows = store.listSubmissionsForTeacher(request.user.userId).map((submission) => [
+    students.get(submission.userId), submission.userId, submission.assignmentId, submission.fileName,
+    submission.submittedAt, submission.status, submission.score?.totalScore, submission.score?.deduction,
+    submission.score?.gradingNotes, submission.manualFeedback
+  ]);
+  const csv = [['Student', 'Student ID', 'Assignment ID', 'File', 'Submitted At', 'Status', 'Score', 'Deduction', 'Grading Notes', 'Feedback'], ...rows]
+    .map((row) => row.map(csvCell).join(',')).join('\r\n');
+  response.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  response.setHeader('Content-Disposition', 'attachment; filename="teacher-grades.csv"');
+  return response.send(`\uFEFF${csv}`);
+});
+
+app.get('/api/teacher/report.xlsx', teacherOnly, async (request, response, next) => {
+  try {
+    const students = new Map(store.users.map((user) => [user.userId, user.fullName]));
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = request.user.fullName;
+    workbook.created = new Date();
+    const sheet = workbook.addWorksheet('Grades', { views: [{ state: 'frozen', ySplit: 1 }] });
+    sheet.columns = [
+      { header: 'Student', key: 'student', width: 28 },
+      { header: 'Student ID', key: 'studentId', width: 16 },
+      { header: 'Assignment ID', key: 'assignmentId', width: 38 },
+      { header: 'File', key: 'fileName', width: 32 },
+      { header: 'Submitted At', key: 'submittedAt', width: 22, style: { numFmt: 'yyyy-mm-dd hh:mm' } },
+      { header: 'Status', key: 'status', width: 16 },
+      { header: 'Score', key: 'score', width: 12, style: { numFmt: '0.0' } },
+      { header: 'Deduction', key: 'deduction', width: 12, style: { numFmt: '0.0' } },
+      { header: 'Grading Notes', key: 'gradingNotes', width: 40 },
+      { header: 'Feedback', key: 'feedback', width: 40 }
+    ];
+    sheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF174D3B' } };
+    for (const submission of store.listSubmissionsForTeacher(request.user.userId)) {
+      sheet.addRow({
+        student: students.get(submission.userId) ?? 'Unknown student',
+        studentId: submission.userId,
+        assignmentId: submission.assignmentId ?? '',
+        fileName: submission.fileName,
+        submittedAt: submission.submittedAt ? new Date(submission.submittedAt) : null,
+        status: submission.status,
+        score: submission.score?.totalScore ?? null,
+        deduction: submission.score?.deduction ?? null,
+        gradingNotes: submission.score?.gradingNotes ?? '',
+        feedback: submission.manualFeedback ?? ''
+      });
+    }
+    sheet.autoFilter = { from: 'A1', to: 'J1' };
+    response.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    response.setHeader('Content-Disposition', 'attachment; filename="teacher-grades.xlsx"');
+    await workbook.xlsx.write(response);
+    return response.end();
+  } catch (error) {
+    return next(error);
+  }
 });
 
 app.get('/api/teacher/rules', teacherOnly, (request, response) => {
@@ -351,15 +599,20 @@ app.patch('/api/teacher/rules/:ruleCode', teacherOnly, (request, response) => {
 app.patch('/api/teacher/submissions/:submissionId/grade', teacherOnly, (request, response) => {
   const totalScore = Number(request.body?.totalScore);
   const deduction = Number(request.body?.deduction ?? 0);
+  const reason = String(request.body?.reason ?? '').trim();
   if (!Number.isFinite(totalScore) || totalScore < 0 || totalScore > 10
       || !Number.isFinite(deduction) || deduction < 0 || deduction > 10) {
     return response.status(400).json({ error: 'Score and deduction must be between 0 and 10.' });
   }
-  const submission = store.updateGrade(request.params.submissionId, {
+  if (!reason || reason.length > 500) return response.status(400).json({ error: 'Enter a grade-change reason under 500 characters.' });
+   if (!store.findSubmissionForTeacher(request.user.userId, request.params.submissionId)) {
+     return response.status(404).json({ error: 'Submission not found.' });
+   }
+  const submission = store.updateGrade(request.user.userId, request.params.submissionId, {
     totalScore,
     deduction,
     gradingNotes: String(request.body?.gradingNotes ?? '').slice(0, 2000)
-  });
+  }, reason);
   if (!submission) return response.status(404).json({ error: 'Submission not found.' });
   return response.json({ submission: publicSubmission(submission) });
 });
@@ -369,7 +622,10 @@ app.patch('/api/teacher/submissions/:submissionId/feedback', teacherOnly, (reque
   if (!feedback || feedback.length > 4000) {
     return response.status(400).json({ error: 'Feedback must contain 1 to 4000 characters.' });
   }
-  const submission = store.updateFeedback(request.params.submissionId, feedback);
+   if (!store.findSubmissionForTeacher(request.user.userId, request.params.submissionId)) {
+     return response.status(404).json({ error: 'Submission not found.' });
+   }
+   const submission = store.updateFeedback(request.params.submissionId, feedback);
   if (!submission) return response.status(404).json({ error: 'Submission not found.' });
   return response.json({ submission: publicSubmission(submission) });
 });

@@ -46,6 +46,12 @@ export function createAuth(store) {
         hashPassword(password)
       );
     },
+    changePassword({ userId, currentPassword, newPassword }) {
+      const user = store.findUserById(userId);
+      const password = String(newPassword ?? '');
+      if (!user || password.length < 8 || !matchesPasswordHash(currentPassword ?? '', user.passwordHash)) return false;
+      return store.updateUserPassword(userId, hashPassword(password));
+    },
     getUser(token) {
       const session = sessions.get(token);
       if (!session) return null;

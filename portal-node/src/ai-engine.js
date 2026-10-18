@@ -39,6 +39,18 @@ function findRule(rules, code) {
   return rules.find((rule) => rule.ruleCode === code && rule.enabled !== false);
 }
 
+function addFinding(findings, rule, source, lineNumber, suggestedFix) {
+  if (!rule) return;
+  findings.push({
+    ruleCode: rule.ruleCode,
+    ruleName: rule.ruleName,
+    severity: rule.severity,
+    penaltyPoints: Number(rule.penaltyPoints) || 0,
+    lineNumber,
+    suggestedFix
+  });
+}
+
 function runStaticRules(source, rules) {
   const findings = [];
   const patterns = [
@@ -56,6 +68,21 @@ function runStaticRules(source, rules) {
       code: 'CS',
       pattern: /\bclass\s+([a-z][A-Za-z0-9_]*)/g,
       suggestion: 'Use an uppercase initial letter for Java class names.'
+    },
+    {
+      code: 'COMMENT',
+      pattern: /\b(?:public|protected|private)\s+(?:static\s+)?(?:void|[A-Z_a-z][\w<>.?\[\]]*)\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{/g,
+      suggestion: 'Add a concise comment or Javadoc for this method.'
+    },
+    {
+      code: 'LONG_METHOD',
+      pattern: /\b(?:public|protected|private)\s+(?:static\s+)?(?:void|[A-Z_a-z][\w<>.?\[\]]*)\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{/g,
+      suggestion: 'Split this method into smaller, focused methods.'
+    },
+    {
+      code: 'DUPLICATE_CODE',
+      pattern: /\b(?:public|protected|private)\s+(?:static\s+)?(?:void|[A-Z_a-z][\w<>.?\[\]]*)\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{/g,
+      suggestion: 'Extract repeated logic into a shared method.'
     }
   ];
 
@@ -64,14 +91,52 @@ function runStaticRules(source, rules) {
     if (!rule) continue;
     for (const match of source.matchAll(check.pattern)) {
       if (check.code === 'CS' && !/^[a-z]/.test(match[1])) continue;
-      findings.push({
-        ruleCode: rule.ruleCode,
-        ruleName: rule.ruleName,
-        severity: rule.severity,
-        penaltyPoints: Number(rule.penaltyPoints) || 0,
-        lineNumber: lineAt(source, match.index),
-        suggestedFix: check.suggestion
-      });
+      if (check.code === 'COMMENT') {
+        const before = source.slice(0, match.index);
+        const prefix = before.trimEnd();
+        if (/(?:\/\*\*?[\s\S]*?\*\/|\/\/[^\n]*)\s*$/.test(prefix) || /@Override\s*$/.test(prefix)) continue;
+      }
+      if (check.code === 'LONG_METHOD' || check.code === 'DUPLICATE_CODE') continue;
+      addFinding(findings, rule, source, lineAt(source, match.index), check.suggestion);
+    }
+  }
+
+  const scrub = (value) => value.replace(/[^\n]/g, ' ');
+  const scrubbed = source.replace(/\/\*[\s\S]*?\*\//g, scrub)
+    .replace(/\/\/.*$/gm, scrub)
+    .replace(/"""[\s\S]*?"""|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'/g, scrub);
+  const methodPattern = /\b(?:public|protected|private)\s+(?:static\s+)?(?:void|[A-Z_a-z][\w<>.?\[\]]*)\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{/g;
+  const methodRanges = [];
+  for (const match of scrubbed.matchAll(methodPattern)) {
+    const openBrace = scrubbed.indexOf('{', match.index);
+    let depth = 0;
+    let end = openBrace;
+    for (; end < scrubbed.length; end += 1) {
+      if (scrubbed[end] === '{') depth += 1;
+      if (scrubbed[end] === '}' && --depth === 0) break;
+    }
+    if (depth !== 0) continue;
+    const body = scrubbed.slice(openBrace + 1, end);
+    const lineCount = lineAt(scrubbed, end) - lineAt(scrubbed, openBrace);
+    const name = match[0].match(/[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{$/)?.[0] ?? match[0];
+    methodRanges.push({ start: match.index, end, body, lineCount, name });
+    const longRule = findRule(rules, 'LONG_METHOD');
+    if (longRule && lineCount > 40) {
+      addFinding(findings, longRule, source, lineAt(source, match.index), `Method spans ${lineCount} lines; ${longRule.description || 'split it into smaller methods.'}`);
+    }
+  }
+
+  const duplicateRule = findRule(rules, 'DUPLICATE_CODE');
+  if (duplicateRule) {
+    for (let first = 0; first < methodRanges.length; first += 1) {
+      const normalizedFirst = methodRanges[first].body.replace(/\s+/g, ' ').trim();
+      if (normalizedFirst.length < 80) continue;
+      for (let second = first + 1; second < methodRanges.length; second += 1) {
+        const normalizedSecond = methodRanges[second].body.replace(/\s+/g, ' ').trim();
+        if (normalizedFirst === normalizedSecond) {
+          addFinding(findings, duplicateRule, source, lineAt(source, methodRanges[second].start), 'This method body duplicates another method; extract the shared logic.');
+        }
+      }
     }
   }
   return findings;

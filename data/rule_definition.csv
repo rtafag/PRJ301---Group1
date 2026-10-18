@@ -2,3 +2,6 @@ ruleId,ruleCode,ruleName,severity,penaltyPoints,description
 1,NPE,NullPointerException,High,2.0,Avoid returning null without check
 2,OOM,OutOfMemoryError,Critical,5.0,Memory leak detected in loop
 3,CS,CodeStyle,Low,0.5,Variable naming convention violation
+4,COMMENT,MissingComment,Low,0.5,Add concise comments or Javadoc to public methods
+5,LONG_METHOD,LongMethod,Medium,1.0,Keep methods at 40 source lines or fewer
+6,DUPLICATE_CODE,DuplicateCode,Medium,1.5,Extract repeated method bodies into shared helpers
