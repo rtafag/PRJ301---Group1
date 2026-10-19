@@ -8,10 +8,18 @@ import path from 'node:path';
 import { analyzeJavaSource, sha256 } from './ai-engine.js';
 import { createAuth, requireAuth } from './auth.js';
 import { runJavaInSandbox } from './sandbox.js';
+import { createSqlRuntimeRepository } from './sql-store.js';
 import { createStore, portalDirectory } from './store.js';
 
 const app = express();
-const store = createStore();
+const sqlRepository = process.env.PORTAL_STORAGE?.toLowerCase() === 'sqlserver'
+  ? await createSqlRuntimeRepository()
+  : null;
+const store = createStore(sqlRepository ? {
+  runtimeData: await sqlRepository.load(),
+  saveRuntimeData: (runtimeData) => sqlRepository.save(runtimeData)
+} : {});
+if (sqlRepository) await sqlRepository.save(store.getRuntimeData());
 const auth = createAuth(store);
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -70,7 +78,8 @@ app.get('/api/health', (request, response) => {
   response.json({
     status: 'ok',
     aiProvider: process.env.AI_PROVIDER || 'disabled',
-    sandboxEnabled: process.env.SANDBOX_ENABLED === 'true'
+    sandboxEnabled: process.env.SANDBOX_ENABLED === 'true',
+    storage: sqlRepository ? 'sqlserver' : 'json'
   });
 });
 
@@ -80,7 +89,7 @@ app.post('/api/auth/login', (request, response) => {
   return response.json(result);
 });
 
-app.post('/api/auth/password-reset', (request, response) => {
+app.post('/api/auth/password-reset', async (request, response) => {
   const { email, confirmationKey, newPassword } = request.body ?? {};
   if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
       || typeof confirmationKey !== 'string' || !confirmationKey.trim()
@@ -90,6 +99,7 @@ app.post('/api/auth/password-reset', (request, response) => {
   if (!auth.resetPassword({ email, confirmationKey, newPassword })) {
     return response.status(400).json({ error: 'Email and confirmation key do not match an account.' });
   }
+  await store.flushPersistence();
   return response.json({ message: 'Password updated. You can now sign in with your new password.' });
 });
 
@@ -103,7 +113,7 @@ app.get('/api/me', requireAuth(auth), (request, response) => {
   response.json({ user });
 });
 
-app.patch('/api/me/profile', requireAuth(auth), (request, response) => {
+app.patch('/api/me/profile', requireAuth(auth), async (request, response) => {
   const fullName = String(request.body?.fullName ?? '').trim();
   const email = String(request.body?.email ?? '').trim().toLowerCase();
   if (!fullName || fullName.length > 120 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -112,10 +122,12 @@ app.patch('/api/me/profile', requireAuth(auth), (request, response) => {
   if (store.users.some((user) => user.userId !== request.user.userId && user.email.toLowerCase() === email)) {
     return response.status(409).json({ error: 'This email address is already used by another account.' });
   }
-  return response.json({ user: store.updateUserProfile(request.user.userId, { fullName, email }) });
+  const user = store.updateUserProfile(request.user.userId, { fullName, email });
+  await store.flushPersistence();
+  return response.json({ user });
 });
 
-app.patch('/api/me/password', requireAuth(auth), (request, response) => {
+app.patch('/api/me/password', requireAuth(auth), async (request, response) => {
   const { currentPassword, newPassword } = request.body ?? {};
   if (typeof newPassword !== 'string' || newPassword.length < 8 || newPassword.length > 128) {
     return response.status(400).json({ error: 'New password must contain 8 to 128 characters.' });
@@ -123,6 +135,7 @@ app.patch('/api/me/password', requireAuth(auth), (request, response) => {
   if (!auth.changePassword({ userId: request.user.userId, currentPassword, newPassword })) {
     return response.status(400).json({ error: 'Current password is incorrect.' });
   }
+  await store.flushPersistence();
   return response.json({ message: 'Password updated.' });
 });
 
@@ -130,10 +143,11 @@ app.get('/api/me/notifications', requireAuth(auth), (request, response) => {
   return response.json({ notifications: store.listNotifications(request.user.userId) });
 });
 
-app.patch('/api/me/notifications/:notificationId/read', requireAuth(auth), (request, response) => {
+app.patch('/api/me/notifications/:notificationId/read', requireAuth(auth), async (request, response) => {
   if (!store.markNotificationRead(request.user.userId, request.params.notificationId)) {
     return response.status(404).json({ error: 'Notification not found.' });
   }
+  await store.flushPersistence();
   return response.status(204).end();
 });
 
@@ -169,7 +183,7 @@ app.post('/api/student/submissions', studentOnly, (request, response, next) => {
     const analysisPromise = javaFile
       ? analyzeJavaSource(sourceCode, store.listRules())
       : Promise.resolve(null);
-    analysisPromise.then((analysis) => {
+    analysisPromise.then(async (analysis) => {
       const score = analysis ? {
         totalScore: analysis.totalScore,
         deduction: analysis.deduction,
@@ -200,6 +214,7 @@ app.post('/api/student/submissions', studentOnly, (request, response, next) => {
         manualFeedback: ''
       });
 
+      await store.flushPersistence();
       return response.status(201).json({ submission: publicSubmission(submission) });
     }).catch(next);
   });
@@ -253,9 +268,10 @@ app.get('/api/student/assignments', studentOnly, (request, response) => {
   return response.json({ assignments });
 });
 
-app.patch('/api/student/assignments/:assignmentId/read', studentOnly, (request, response) => {
+app.patch('/api/student/assignments/:assignmentId/read', studentOnly, async (request, response) => {
   const assignment = store.markAssignmentRead(request.user.userId, request.params.assignmentId);
   if (!assignment) return response.status(404).json({ error: 'Assignment not found for your courses.' });
+  await store.flushPersistence();
   return response.json({ assignment: { ...publicAssignment(assignment), isRead: true } });
 });
 
@@ -305,18 +321,20 @@ app.get('/api/teacher/classes', teacherOnly, (request, response) => {
   });
 });
 
-app.patch('/api/teacher/classes/:courseCode/enrollments/:studentId', teacherOnly, (request, response) => {
+app.patch('/api/teacher/classes/:courseCode/enrollments/:studentId', teacherOnly, async (request, response) => {
   if (typeof request.body?.enrolled !== 'boolean') return response.status(400).json({ error: 'Enrolled must be a boolean.' });
   const result = store.updateEnrollment(request.user.userId, request.params.courseCode, request.params.studentId, request.body.enrolled);
   if (result === null) return response.status(403).json({ error: 'This course is not assigned to your account.' });
   if (!result) return response.status(404).json({ error: 'Student not found.' });
+  await store.flushPersistence();
   return response.status(204).end();
 });
 
-app.patch('/api/teacher/classes/:courseCode/teachers', teacherOnly, (request, response) => {
+app.patch('/api/teacher/classes/:courseCode/teachers', teacherOnly, async (request, response) => {
   const result = store.updateCourseTeachers(request.user.userId, request.params.courseCode, request.body?.teacherIds);
   if (result === null) return response.status(403).json({ error: 'This course is not assigned to your account.' });
   if (!result) return response.status(400).json({ error: 'Assign at least one valid teacher.' });
+  await store.flushPersistence();
   return response.json({ courseCode: request.params.courseCode, teacherIds: request.body.teacherIds });
 });
 
@@ -331,7 +349,7 @@ app.get('/api/teacher/course-grades', teacherOnly, (request, response) => {
   return response.json({ grades });
 });
 
-app.patch('/api/teacher/course-grades/:studentId', teacherOnly, (request, response) => {
+app.patch('/api/teacher/course-grades/:studentId', teacherOnly, async (request, response) => {
   const courseCode = String(request.body?.courseCode ?? '').trim();
   const semester = String(request.body?.semester ?? '').trim();
   const totalScore = Number(request.body?.totalScore);
@@ -349,10 +367,11 @@ app.patch('/api/teacher/course-grades/:studentId', teacherOnly, (request, respon
     gradingNotes: String(request.body?.gradingNotes ?? '').slice(0, 2000)
   });
   if (!grade) return response.status(404).json({ error: 'Course grade not found.' });
+  await store.flushPersistence();
   return response.json({ grade });
 });
 
-app.patch('/api/teacher/course-grades/:studentId/feedback', teacherOnly, (request, response) => {
+app.patch('/api/teacher/course-grades/:studentId/feedback', teacherOnly, async (request, response) => {
   const courseCode = String(request.body?.courseCode ?? '').trim();
   const semester = String(request.body?.semester ?? '').trim();
   const manualFeedback = String(request.body?.manualFeedback ?? '').trim();
@@ -364,6 +383,7 @@ app.patch('/api/teacher/course-grades/:studentId/feedback', teacherOnly, (reques
   }
   const grade = store.updateCourseFeedback(request.user.userId, courseCode, semester, request.params.studentId, manualFeedback);
   if (!grade) return response.status(404).json({ error: 'Course grade not found.' });
+  await store.flushPersistence();
   return response.json({ grade });
 });
 
@@ -450,13 +470,14 @@ app.post('/api/teacher/submissions/:submissionId/analyze', teacherOnly, async (r
       deduction: analysis.deduction,
       gradingNotes: analysis.violations.length ? 'Rule engine findings are available for review.' : 'No configured rule violations found.'
     });
+    await store.flushPersistence();
     return response.json({ submission: updated });
   } catch (error) {
     return next(error);
   }
 });
 
-app.post('/api/teacher/assignments', teacherOnly, (request, response) => {
+app.post('/api/teacher/assignments', teacherOnly, async (request, response) => {
   const title = String(request.body?.title ?? '').trim();
   const courseCode = String(request.body?.courseCode ?? '').trim();
   const description = String(request.body?.description ?? '').trim();
@@ -473,10 +494,11 @@ app.post('/api/teacher/assignments', teacherOnly, (request, response) => {
     description,
     dueAt: dueAt.toISOString()
   });
+  await store.flushPersistence();
   return response.status(201).json({ assignment: publicAssignment(assignment) });
 });
 
-app.patch('/api/teacher/assignments/:assignmentId', teacherOnly, (request, response) => {
+app.patch('/api/teacher/assignments/:assignmentId', teacherOnly, async (request, response) => {
   const existing = store.findAssignmentForTeacher(request.user.userId, request.params.assignmentId);
   if (!existing) return response.status(404).json({ error: 'Assignment not found.' });
   const title = String(request.body?.title ?? existing.title).trim();
@@ -499,13 +521,15 @@ app.patch('/api/teacher/assignments/:assignmentId', teacherOnly, (request, respo
     dueAt: dueAt.toISOString(),
     closed: request.body?.closed ?? existing.closed ?? false
   });
+  await store.flushPersistence();
   return response.json({ assignment: publicAssignment(assignment) });
 });
 
-app.delete('/api/teacher/assignments/:assignmentId', teacherOnly, (request, response) => {
+app.delete('/api/teacher/assignments/:assignmentId', teacherOnly, async (request, response) => {
   if (!store.deleteAssignment(request.user.userId, request.params.assignmentId)) {
     return response.status(404).json({ error: 'Assignment not found.' });
   }
+  await store.flushPersistence();
   return response.status(204).end();
 });
 
@@ -576,7 +600,7 @@ app.get('/api/teacher/rules', teacherOnly, (request, response) => {
   response.json({ rules: store.listRules() });
 });
 
-app.patch('/api/teacher/rules/:ruleCode', teacherOnly, (request, response) => {
+app.patch('/api/teacher/rules/:ruleCode', teacherOnly, async (request, response) => {
   const changes = {};
   if (request.body?.penaltyPoints !== undefined) {
     const penaltyPoints = Number(request.body.penaltyPoints);
@@ -593,10 +617,11 @@ app.patch('/api/teacher/rules/:ruleCode', teacherOnly, (request, response) => {
   }
   const rule = store.updateRule(request.params.ruleCode, changes);
   if (!rule) return response.status(404).json({ error: 'Rule not found.' });
+  await store.flushPersistence();
   return response.json({ rule });
 });
 
-app.patch('/api/teacher/submissions/:submissionId/grade', teacherOnly, (request, response) => {
+app.patch('/api/teacher/submissions/:submissionId/grade', teacherOnly, async (request, response) => {
   const totalScore = Number(request.body?.totalScore);
   const deduction = Number(request.body?.deduction ?? 0);
   const reason = String(request.body?.reason ?? '').trim();
@@ -614,10 +639,11 @@ app.patch('/api/teacher/submissions/:submissionId/grade', teacherOnly, (request,
     gradingNotes: String(request.body?.gradingNotes ?? '').slice(0, 2000)
   }, reason);
   if (!submission) return response.status(404).json({ error: 'Submission not found.' });
+  await store.flushPersistence();
   return response.json({ submission: publicSubmission(submission) });
 });
 
-app.patch('/api/teacher/submissions/:submissionId/feedback', teacherOnly, (request, response) => {
+app.patch('/api/teacher/submissions/:submissionId/feedback', teacherOnly, async (request, response) => {
   const feedback = String(request.body?.feedback ?? '').trim();
   if (!feedback || feedback.length > 4000) {
     return response.status(400).json({ error: 'Feedback must contain 1 to 4000 characters.' });
@@ -627,6 +653,7 @@ app.patch('/api/teacher/submissions/:submissionId/feedback', teacherOnly, (reque
    }
    const submission = store.updateFeedback(request.params.submissionId, feedback);
   if (!submission) return response.status(404).json({ error: 'Submission not found.' });
+  await store.flushPersistence();
   return response.json({ submission: publicSubmission(submission) });
 });
 
