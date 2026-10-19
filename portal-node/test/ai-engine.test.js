@@ -73,6 +73,20 @@ test('password reset requires matching email and User ID and updates login crede
   assert.ok(auth.login({ username: user.username, passwordHash: 'new-password' }));
 });
 
+test('store sends changed runtime data to its configured persistence adapter', async () => {
+  const savedSnapshots = [];
+  const store = createStore({
+    runtimeData: {},
+    saveRuntimeData: async (runtimeData) => savedSnapshots.push(runtimeData)
+  });
+
+  store.updateUserProfile('HE001', { fullName: 'Updated Student', email: 'updated@example.com' });
+  await store.flushPersistence();
+
+  assert.equal(savedSnapshots.length, 1);
+  assert.equal(savedSnapshots[0].profileOverrides.HE001.fullName, 'Updated Student');
+});
+
 test('course students are evenly split among assigned teachers', () => {
   const store = createStore();
   const teachers = parse(readFileSync(new URL('../../data/teachers.csv', import.meta.url), 'utf8'), {
