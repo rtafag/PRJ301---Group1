@@ -18,6 +18,7 @@
     "express": "^5.2.1",
     "helmet": "^8.1.0",
     "java-parser": "^3.0.1",
+    "mssql": "^12.7.10",
     "multer": "^2.0.2"
   },
   "overrides": {
