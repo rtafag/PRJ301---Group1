@@ -100,7 +100,7 @@ function jaccardSimilarity(first, second) {
   return overlap / (first.size + second.size - overlap);
 }
 
-export function createStore() {
+export function createStore({ runtimeData: initialRuntimeData, saveRuntimeData } = {}) {
   const users = readCsv('users.csv').map((row) => ({
     userId: row.userId,
     username: row.username,
@@ -109,7 +109,7 @@ export function createStore() {
     email: row.email,
     role: row.role
   }));
-  const runtime = readRuntimeData();
+  const runtime = initialRuntimeData ?? readRuntimeData();
   const profileOverrides = runtime?.profileOverrides && typeof runtime.profileOverrides === 'object'
     ? runtime.profileOverrides
     : {};
@@ -239,6 +239,7 @@ export function createStore() {
     : csvRules;
   let courseGrades = Array.isArray(runtime?.courseGrades) ? runtime.courseGrades : createCourseGrades();
   let assignments = Array.isArray(runtime?.assignments) ? runtime.assignments : [];
+  let persistenceQueue = Promise.resolve();
   for (const grade of courseGrades) {
     grade.studentId = studentIdBySourceId.get(grade.studentId) ?? grade.studentId;
     grade.teacherId = teacherIdBySourceId.get(grade.teacherId)
@@ -253,17 +254,31 @@ export function createStore() {
     if (!Array.isArray(assignment.readBy)) assignment.readBy = [];
   }
 
-  function persist() {
-    fs.mkdirSync(runtimeDirectory, { recursive: true });
-    const temporaryFile = `${runtimeFile}.tmp`;
-    fs.writeFileSync(temporaryFile, JSON.stringify({
+  function getRuntimeData() {
+    return {
       submissions, rules, courseGrades, assignments, passwordOverrides, gradeAuditLog,
       classManagement, profileOverrides, notifications, notificationReads
-    }, null, 2), 'utf8');
+    };
+  }
+
+  function persist() {
+    const runtimeData = getRuntimeData();
+    if (saveRuntimeData) {
+      const snapshot = JSON.parse(JSON.stringify(runtimeData));
+      persistenceQueue = persistenceQueue.catch(() => {}).then(() => saveRuntimeData(snapshot));
+      return;
+    }
+    fs.mkdirSync(runtimeDirectory, { recursive: true });
+    const temporaryFile = `${runtimeFile}.tmp`;
+    fs.writeFileSync(temporaryFile, JSON.stringify(runtimeData, null, 2), 'utf8');
     fs.renameSync(temporaryFile, runtimeFile);
   }
 
   return {
+    getRuntimeData,
+    flushPersistence() {
+      return persistenceQueue;
+    },
     users,
     findUser(username) {
       return users.find((user) => user.username === username) ?? null;
