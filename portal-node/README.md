@@ -34,7 +34,57 @@ Students see semester and enrolled course selectors in Overview. The notificatio
 
 The static analyzer supports the seeded `NPE`, `OOM`, `CS`, `COMMENT`, `LONG_METHOD`, and `DUPLICATE_CODE` rules. A long method is currently defined as over 40 source lines; duplicate code compares normalized method bodies. Teacher Reports exports the scoped grade list as CSV or XLSX. Code-similarity scores compare token shingles within an assignment and are only review signals, not proof of misconduct.
 
-The default storage is local JSON under `storage/`; it does not modify the repository CSV data or connect to SQL Server. The JSON REST API and storage adapter can be replaced with a SQL Server repository when DB credentials/schema are ready.
+The default storage is local JSON under `storage/`; it does not modify the repository CSV data or connect to SQL Server unless `PORTAL_STORAGE=sqlserver` is configured.
+
+## Save portal changes to SQL Server
+
+The portal can store its runtime state in the same SQL Server database used by the Java project. Start SQL Server, ensure the `AITA_DB` database exists, then run `Copy-Item .env.example .env` from `portal-node` and set:
+
+```env
+PORTAL_STORAGE=sqlserver
+DB_SERVER=localhost
+DB_PORT=1433
+DB_NAME=AITA_DB
+DB_USER=your_sql_login
+DB_PASSWORD=your_sql_password
+DB_ENCRYPT=false
+DB_TRUST_SERVER_CERTIFICATE=true
+```
+
+Run the portal from `portal-node` with `npm.cmd install` and `npm.cmd start`. The portal creates `dbo.PortalRuntimeState` automatically. If the SQL table is empty, the portal imports the existing `storage/portal-data.json` snapshot when available, otherwise it seeds runtime data from the repository CSV files. Once SQL storage is selected, changes are saved in SQL and each modifying API waits for the database write to finish. CSV seed files are not modified.
+
+To inspect the saved state, connect to `AITA_DB` in SQL Server Management Studio (SSMS), open a New Query window, and run:
+
+```sql
+USE AITA_DB;
+
+SELECT StateId, UpdatedAt, ISJSON(RuntimeJson) AS IsValidJson
+FROM dbo.PortalRuntimeState;
+
+SELECT grade.studentId, grade.courseCode, grade.semester,
+			 grade.totalScore, grade.manualFeedback
+FROM dbo.PortalRuntimeState AS state
+CROSS APPLY OPENJSON(state.RuntimeJson, '$.courseGrades')
+WITH (
+	studentId nvarchar(30) '$.studentId',
+	courseCode nvarchar(30) '$.courseCode',
+	semester nvarchar(30) '$.semester',
+	totalScore decimal(4,1) '$.totalScore',
+	manualFeedback nvarchar(4000) '$.manualFeedback'
+) AS grade;
+
+SELECT submission.studentId, submission.fileName, submission.status, submission.submittedAt
+FROM dbo.PortalRuntimeState AS state
+CROSS APPLY OPENJSON(state.RuntimeJson, '$.submissions')
+WITH (
+	studentId nvarchar(30) '$.userId',
+	fileName nvarchar(255) '$.fileName',
+	status nvarchar(30) '$.status',
+	submittedAt datetime2 '$.submittedAt'
+) AS submission;
+```
+
+`PortalRuntimeState` stores one JSON snapshot so the portal can persist all existing workflows without changing their API. CSV files remain the source for seed users and rosters; enrollment overrides, grades, assignments, submissions, feedback, and other portal changes are in the SQL snapshot. To switch back to JSON storage, set `PORTAL_STORAGE=json`.
 
 ## Sandbox
 
