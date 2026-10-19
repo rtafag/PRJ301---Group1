@@ -9,6 +9,7 @@ import com.group1.model.Submission;
 import com.group1.model.Users;
 import com.group1.model.main.AnalysisOutcome;
 import com.group1.model.main.Finding;
+import com.group1.view.ConsoleView;
 import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -38,87 +39,56 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Scanner;
 import java.util.Set;
 
 public class AppController {
-    private final Scanner scanner = new Scanner(System.in);
     private final ConsoleDataStore store = new ConsoleDataStore();
+    private final ConsoleView view = new ConsoleView();
     private Users currentUser;
 
-    
-
     public void run() {
-        String role = chooseRole();
+        String role = view.chooseRole();
         if (role == null) {
-            System.out.println("Goodbye!");
+            view.showGoodbye();
             return;
         }
         currentUser = login(role);
         if (currentUser == null) {
-            System.out.println("Goodbye!");
+            view.showGoodbye();
             return;
         }
-        System.out.println("Login successful. Welcome, " + currentUser.username + "!");
+        view.showLoginSuccessful(currentUser.username);
         if ("Student".equalsIgnoreCase(role))
             runStudentMenu();
         else
             runTeacherMenu();
-        System.out.println("Goodbye!");
-    }
-
-    private String chooseRole() {
-        while (true) {
-            System.out.println("\n=== Welcome to AITA ===");
-            System.out.println("1. Student");
-            System.out.println("2. Teacher");
-            System.out.println("0. Exit");
-            String choice = readLine("Choose your role: ").trim();
-            if ("1".equals(choice))
-                return "Student";
-            if ("2".equals(choice))
-                return "Teacher";
-            if ("0".equals(choice))
-                return null;
-            System.out.println("Invalid option. Please choose 1, 2, or 0.");
-        }
+        view.showGoodbye();
     }
 
     private Users login(String role) {
         List<Users> users = store.readUsers();
         if (users.isEmpty()) {
-            System.out.println("Unable to load users from data/users.csv.");
+            view.showUnableToLoadUsers();
             return null;
         }
         while (true) {
-            System.out.println("\n=== " + role + " Login ===");
-            String username = readLine("Username (0 to exit): ").trim();
+            view.showLoginHeader(role);
+            String username = view.promptUsername();
             if ("0".equals(username))
                 return null;
-            String passwordHash = readLine("Password hash: ").trim();
+            String passwordHash = view.promptPasswordHash();
             for (Users user : users) {
                 if (username.equals(user.username) && passwordHash.equals(user.passwordHash)
                         && role.equalsIgnoreCase(user.role))
                     return user;
             }
-            System.out.println("Invalid username, password hash, or role. Please try again.");
+            view.showInvalidCredentials();
         }
     }
 
     private void runStudentMenu() {
         while (true) {
-            System.out.println("\n=== Student Menu ===");
-            System.out.println("1. Submit Assignment");
-            System.out.println("2. Submit Source Code");
-            System.out.println("3. View Processing Queue");
-            System.out.println("4. Resubmit After Error");
-            System.out.println("5. View Submission History");
-            System.out.println("6. View My Grades");
-            System.out.println("7. View Analysis Results");
-            System.out.println("8. View AI Error Explanations");
-            System.out.println("9. View Suggested Fixes");
-            System.out.println("0. Log Out");
-            switch (readInt("Choose an option: ", 0, 9)) {
+            switch (view.readStudentMenuOption()) {
                 case 0:
                     return;
                 case 1:
@@ -156,17 +126,7 @@ public class AppController {
 
     private void runTeacherMenu() {
         while (true) {
-            System.out.println("\n=== Teacher Menu ===");
-            System.out.println("1. Export Class Report (HTML / CSV)");
-            System.out.println("2. Manage Class Submission List");
-            System.out.println("3. View Summary Reports");
-            System.out.println("4. Configure Rule Engine");
-            System.out.println("5. Run Automatic Grading");
-            System.out.println("6. Edit Grades");
-            System.out.println("7. Provide Manual Feedback");
-            System.out.println("8. Track Analysis Progress");
-            System.out.println("0. Log Out");
-            switch (readInt("Choose an option: ", 0, 8)) {
+            switch (view.readTeacherMenuOption()) {
                 case 0:
                     return;
                 case 1:
@@ -200,7 +160,7 @@ public class AppController {
     }
 
     private void submitAssignment() {
-        String label = readRequired("Assignment name: ");
+        String label = view.readRequired("Assignment name: ");
         Path source = promptForFile("Assignment file path (.zip, .pdf, or source file): ");
         if (source != null)
             createSubmission(source, label, false);
@@ -246,7 +206,7 @@ public class AppController {
             return;
         }
         printSubmissions(eligible, false);
-        Submission selected = findSubmission(eligible, readRequired("Submission ID to resubmit: "));
+        Submission selected = findSubmission(eligible, view.readRequired("Submission ID to resubmit: "));
         if (selected == null) {
             System.out.println("Submission not found.");
             return;
@@ -440,7 +400,7 @@ public class AppController {
     private void configureRuleEngine() {
         List<RuleDefinition> rules = store.readRules();
         printRules(rules);
-        int id = readInt("Rule ID to configure (0 to cancel): ", 0, Integer.MAX_VALUE);
+        int id = view.readInt("Rule ID to configure (0 to cancel): ", 0, Integer.MAX_VALUE);
         if (id == 0)
             return;
         RuleDefinition selected = null;
@@ -451,11 +411,11 @@ public class AppController {
             System.out.println("Rule not found.");
             return;
         }
-        selected.penaltyPoints = readFloat("New penalty points (0-10): ", 0, 10);
-        String severity = readLine("New severity (Enter to keep current): ").trim();
+        selected.penaltyPoints = view.readFloat("New penalty points (0-10): ", 0, 10);
+        String severity = view.readLine("New severity (Enter to keep current): ").trim();
         if (!severity.isEmpty())
             selected.severity = severity;
-        String description = readLine("New description (Enter to keep current): ").trim();
+        String description = view.readLine("New description (Enter to keep current): ").trim();
         if (!description.isEmpty())
             selected.description = description;
         saveRules(rules);
@@ -481,14 +441,14 @@ public class AppController {
     private void editGrade() {
         List<Submission> submissions = store.readSubmissions();
         printSubmissions(submissions, true);
-        String id = readRequired("Submission ID to grade: ");
+        String id = view.readRequired("Submission ID to grade: ");
         if (findSubmission(submissions, id) == null) {
             System.out.println("Submission not found.");
             return;
         }
-        float total = readFloat("Score (0-10): ", 0, 10);
-        float deduction = readFloat("Deduction (0-10): ", 0, 10);
-        String notes = readRequired("Grading notes: ");
+        float total = view.readFloat("Score (0-10): ", 0, 10);
+        float deduction = view.readFloat("Deduction (0-10): ", 0, 10);
+        String notes = view.readRequired("Grading notes: ");
         List<Score> scores = store.readScores();
         Score score = findScore(scores, id);
         if (score == null)
@@ -510,7 +470,7 @@ public class AppController {
     private void provideManualFeedback() {
         List<Submission> submissions = store.readSubmissions();
         printSubmissions(submissions, true);
-        String id = readRequired("Submission ID for feedback: ");
+        String id = view.readRequired("Submission ID for feedback: ");
         if (findSubmission(submissions, id) == null) {
             System.out.println("Submission not found.");
             return;
@@ -524,7 +484,7 @@ public class AppController {
             }
         }
         feedback.add(new String[] { String.valueOf(nextId), id, currentUser.userId,
-                readRequired("Manual feedback: "), timestamp() });
+                view.readRequired("Manual feedback: "), timestamp() });
         try {
             store.saveManualFeedback(feedback);
             System.out.println("Manual feedback saved separately from the numeric grade.");
@@ -785,7 +745,7 @@ public class AppController {
     }
 
     private Path promptForFile(String prompt) {
-        Path path = Paths.get(readRequired(prompt)).toAbsolutePath().normalize();
+        Path path = Paths.get(view.readRequired(prompt)).toAbsolutePath().normalize();
         if (!Files.isRegularFile(path)) {
             System.out.println("File not found: " + path);
             return null;
@@ -805,44 +765,6 @@ public class AppController {
         for (byte value : digest.digest())
             result.append(String.format("%02x", value & 0xff));
         return result.toString();
-    }
-
-    private int readInt(String prompt, int min, int max) {
-        while (true) {
-            try {
-                int value = Integer.parseInt(readLine(prompt).trim());
-                if (value >= min && value <= max)
-                    return value;
-            } catch (NumberFormatException ignored) {
-            }
-            System.out.printf("Enter a number from %d to %d.%n", min, max);
-        }
-    }
-
-    private float readFloat(String prompt, float min, float max) {
-        while (true) {
-            try {
-                float value = Float.parseFloat(readLine(prompt).trim());
-                if (value >= min && value <= max)
-                    return value;
-            } catch (NumberFormatException ignored) {
-            }
-            System.out.printf("Enter a number from %.1f to %.1f.%n", min, max);
-        }
-    }
-
-    private String readRequired(String prompt) {
-        while (true) {
-            String value = readLine(prompt).trim();
-            if (!value.isEmpty())
-                return value;
-            System.out.println("This value is required.");
-        }
-    }
-
-    private String readLine(String prompt) {
-        System.out.print(prompt);
-        return scanner.nextLine();
     }
 
     private String timestamp() {
