@@ -5,6 +5,25 @@ import java.util.Scanner;
 public class ConsoleView {
     private final Scanner scanner = new Scanner(System.in);
 
+    public interface MenuActions {
+        void submitAssignment();
+        void submitSourceCode();
+        void viewProcessingQueue();
+        void resubmitAfterError();
+        void viewSubmissionHistory();
+        void viewMyGrades();
+        void viewAnalysisResults(boolean explanationsOnly);
+        void viewSuggestedFixes();
+        void exportClassReport();
+        void manageClassSubmissions();
+        void viewSummaryReports();
+        void configureRuleEngine();
+        void runAutomaticGrading();
+        void editGrade();
+        void provideManualFeedback();
+        void trackAnalysisProgress();
+    }
+
     public String chooseRole() {
         while (true) {
             System.out.println("\n=== Welcome to AITA ===");
@@ -77,6 +96,79 @@ public class ConsoleView {
         System.out.println("8. Track Analysis Progress");
         System.out.println("0. Log Out");
         return readInt("Choose an option: ", 0, 8);
+    }
+
+    public void runStudentMenu(MenuActions actions) {
+        while (true) {
+            switch (readStudentMenuOption()) {
+                case 0:
+                    return;
+                case 1:
+                    actions.submitAssignment();
+                    break;
+                case 2:
+                    actions.submitSourceCode();
+                    break;
+                case 3:
+                    actions.viewProcessingQueue();
+                    break;
+                case 4:
+                    actions.resubmitAfterError();
+                    break;
+                case 5:
+                    actions.viewSubmissionHistory();
+                    break;
+                case 6:
+                    actions.viewMyGrades();
+                    break;
+                case 7:
+                    actions.viewAnalysisResults(false);
+                    break;
+                case 8:
+                    actions.viewAnalysisResults(true);
+                    break;
+                case 9:
+                    actions.viewSuggestedFixes();
+                    break;
+                default:
+                    System.out.println("Invalid option.");
+            }
+        }
+    }
+
+    public void runTeacherMenu(MenuActions actions) {
+        while (true) {
+            switch (readTeacherMenuOption()) {
+                case 0:
+                    return;
+                case 1:
+                    actions.exportClassReport();
+                    break;
+                case 2:
+                    actions.manageClassSubmissions();
+                    break;
+                case 3:
+                    actions.viewSummaryReports();
+                    break;
+                case 4:
+                    actions.configureRuleEngine();
+                    break;
+                case 5:
+                    actions.runAutomaticGrading();
+                    break;
+                case 6:
+                    actions.editGrade();
+                    break;
+                case 7:
+                    actions.provideManualFeedback();
+                    break;
+                case 8:
+                    actions.trackAnalysisProgress();
+                    break;
+                default:
+                    System.out.println("Invalid option.");
+            }
+        }
     }
 
     public int readInt(String prompt, int min, int max) {

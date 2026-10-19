@@ -41,7 +41,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class AppController {
+public class AppController implements ConsoleView.MenuActions {
     private final ConsoleDataStore store = new ConsoleDataStore();
     private final ConsoleView view = new ConsoleView();
     private Users currentUser;
@@ -59,9 +59,9 @@ public class AppController {
         }
         view.showLoginSuccessful(currentUser.username);
         if ("Student".equalsIgnoreCase(role))
-            runStudentMenu();
+            view.runStudentMenu(this);
         else
-            runTeacherMenu();
+            view.runTeacherMenu(this);
         view.showGoodbye();
     }
 
@@ -86,87 +86,16 @@ public class AppController {
         }
     }
 
-    private void runStudentMenu() {
-        while (true) {
-            switch (view.readStudentMenuOption()) {
-                case 0:
-                    return;
-                case 1:
-                    submitAssignment();
-                    break;
-                case 2:
-                    submitSourceCode();
-                    break;
-                case 3:
-                    viewProcessingQueue();
-                    break;
-                case 4:
-                    resubmitAfterError();
-                    break;
-                case 5:
-                    viewSubmissionHistory();
-                    break;
-                case 6:
-                    viewMyGrades();
-                    break;
-                case 7:
-                    viewAnalysisResults(false);
-                    break;
-                case 8:
-                    viewAnalysisResults(true);
-                    break;
-                case 9:
-                    viewSuggestedFixes();
-                    break;
-                default:
-                    System.out.println("Invalid option.");
-            }
-        }
-    }
-
-    private void runTeacherMenu() {
-        while (true) {
-            switch (view.readTeacherMenuOption()) {
-                case 0:
-                    return;
-                case 1:
-                    exportClassReport();
-                    break;
-                case 2:
-                    manageClassSubmissions();
-                    break;
-                case 3:
-                    viewSummaryReports();
-                    break;
-                case 4:
-                    configureRuleEngine();
-                    break;
-                case 5:
-                    runAutomaticGrading();
-                    break;
-                case 6:
-                    editGrade();
-                    break;
-                case 7:
-                    provideManualFeedback();
-                    break;
-                case 8:
-                    trackAnalysisProgress();
-                    break;
-                default:
-                    System.out.println("Invalid option.");
-            }
-        }
-    }
-
-    private void submitAssignment() {
+    @Override
+    public void submitAssignment() {
         String label = view.readRequired("Assignment name: ");
         Path source = promptForFile("Assignment file path (.zip, .pdf, or source file): ");
         if (source != null)
             createSubmission(source, label, false);
     }
 
-    private void submitSourceCode() {
+    @Override
+    public void submitSourceCode() {
         Path source = promptForFile("Java source file path: ");
         if (source == null)
             return;
@@ -194,7 +123,8 @@ public class AppController {
         }
     }
 
-    private void resubmitAfterError() {
+    @Override
+    public void resubmitAfterError() {
         List<Submission> eligible = new ArrayList<>();
         for (Submission item : store.readSubmissions()) {
             if (item.userId.equals(currentUser.userId) && ("Needs Review".equalsIgnoreCase(item.status)
@@ -230,7 +160,8 @@ public class AppController {
         }
     }
 
-    private void viewProcessingQueue() {
+    @Override
+    public void viewProcessingQueue() {
         List<Submission> queue = new ArrayList<>();
         for (Submission item : store.readSubmissions()) {
             if (item.userId.equals(currentUser.userId) && !"Graded".equalsIgnoreCase(item.status))
@@ -243,7 +174,8 @@ public class AppController {
             printSubmissions(queue, false);
     }
 
-    private void viewSubmissionHistory() {
+    @Override
+    public void viewSubmissionHistory() {
         List<Submission> own = submissionsForCurrentUser();
         System.out.println("\n=== Submission History ===");
         if (own.isEmpty())
@@ -252,7 +184,8 @@ public class AppController {
             printSubmissions(own, false);
     }
 
-    private void viewMyGrades() {
+    @Override
+    public void viewMyGrades() {
         Map<String, Submission> own = submissionMap(submissionsForCurrentUser());
         List<Score> scores = new ArrayList<>();
         for (Score score : store.readScores())
@@ -270,7 +203,8 @@ public class AppController {
         }
     }
 
-    private void viewAnalysisResults(boolean explanationsOnly) {
+    @Override
+    public void viewAnalysisResults(boolean explanationsOnly) {
         Map<String, Submission> own = submissionMap(submissionsForCurrentUser());
         boolean found = false;
         System.out.println(explanationsOnly ? "\n=== AI Error Explanations ===" : "\n=== Analysis Results ===");
@@ -291,7 +225,8 @@ public class AppController {
             System.out.println("No analysis results are available yet.");
     }
 
-    private void viewSuggestedFixes() {
+    @Override
+    public void viewSuggestedFixes() {
         Map<String, Submission> own = submissionMap(submissionsForCurrentUser());
         Map<Integer, AnalysisResult> analyses = new HashMap<>();
         for (AnalysisResult analysis : store.readAnalysisResults())
@@ -312,7 +247,8 @@ public class AppController {
             System.out.println("No suggested fixes are available.");
     }
 
-    private void manageClassSubmissions() {
+    @Override
+    public void manageClassSubmissions() {
         List<Submission> submissions = store.readSubmissions();
         System.out.println("\n=== Class Submission List ===");
         if (submissions.isEmpty())
@@ -321,7 +257,8 @@ public class AppController {
             printSubmissions(submissions, true);
     }
 
-    private void viewSummaryReports() {
+    @Override
+    public void viewSummaryReports() {
         List<Users> students = students();
         List<Submission> submissions = store.readSubmissions();
         List<Score> scores = store.readScores();
@@ -353,7 +290,8 @@ public class AppController {
                 totalGraded == 0 ? "-" : String.format("%.2f", totalScore / totalGraded));
     }
 
-    private void exportClassReport() {
+    @Override
+    public void exportClassReport() {
         try {
             Path reports = store.getDataDirectory().resolve("reports");
             Files.createDirectories(reports);
@@ -397,7 +335,8 @@ public class AppController {
         }
     }
 
-    private void configureRuleEngine() {
+    @Override
+    public void configureRuleEngine() {
         List<RuleDefinition> rules = store.readRules();
         printRules(rules);
         int id = view.readInt("Rule ID to configure (0 to cancel): ", 0, Integer.MAX_VALUE);
@@ -421,7 +360,8 @@ public class AppController {
         saveRules(rules);
     }
 
-    private void runAutomaticGrading() {
+    @Override
+    public void runAutomaticGrading() {
         List<Submission> queue = new ArrayList<>();
         for (Submission submission : store.readSubmissions()) {
             if (isLocalJavaFile(submission) && !"Graded".equalsIgnoreCase(submission.status))
@@ -438,7 +378,8 @@ public class AppController {
         System.out.printf("Automatic grading completed for %d of %d submissions.%n", completed, queue.size());
     }
 
-    private void editGrade() {
+    @Override
+    public void editGrade() {
         List<Submission> submissions = store.readSubmissions();
         printSubmissions(submissions, true);
         String id = view.readRequired("Submission ID to grade: ");
@@ -467,7 +408,8 @@ public class AppController {
         }
     }
 
-    private void provideManualFeedback() {
+    @Override
+    public void provideManualFeedback() {
         List<Submission> submissions = store.readSubmissions();
         printSubmissions(submissions, true);
         String id = view.readRequired("Submission ID for feedback: ");
@@ -493,7 +435,8 @@ public class AppController {
         }
     }
 
-    private void trackAnalysisProgress() {
+    @Override
+    public void trackAnalysisProgress() {
         Map<String, Integer> counts = new HashMap<>();
         for (Submission submission : store.readSubmissions()) {
             String status = submission.status == null ? "Unknown" : submission.status;
