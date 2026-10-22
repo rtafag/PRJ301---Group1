@@ -7,8 +7,8 @@ import com.group1.model.RuleViolation;
 import com.group1.model.Score;
 import com.group1.model.Submission;
 import com.group1.model.Users;
-import com.group1.model.main.AnalysisOutcome;
-import com.group1.model.main.Finding;
+import com.group1.model.AnalysisOutcome;
+import com.group1.model.Finding;
 import com.group1.view.ConsoleView;
 import com.github.javaparser.ParseProblemException;
 import com.github.javaparser.StaticJavaParser;
@@ -740,3 +740,4 @@ public class AppController implements ConsoleView.MenuActions {
     }
 
 }
+

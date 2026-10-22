@@ -1,4 +1,4 @@
-package com.group1.model.main;
+package com.group1.model;
 
 import com.group1.model.RuleDefinition;
 

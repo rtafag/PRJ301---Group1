@@ -1,4 +1,4 @@
-package com.group1.model.main;
+package com.group1.model;
 
 import java.util.ArrayList;
 import java.util.List;
