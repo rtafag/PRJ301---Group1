@@ -83,6 +83,36 @@ function runStaticRules(source, rules) {
       code: 'DUPLICATE_CODE',
       pattern: /\b(?:public|protected|private)\s+(?:static\s+)?(?:void|[A-Z_a-z][\w<>.?\[\]]*)\s+[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{/g,
       suggestion: 'Extract repeated logic into a shared method.'
+    },
+    {
+      code: 'INF_LOOP',
+      pattern: /\b(?:while\s*\(\s*true\s*\)|for\s*\(\s*;\s*;\s*\))/g,
+      suggestion: 'Potential infinite loop detected without a termination condition or break statement.'
+    },
+    {
+      code: 'STR_EQ',
+      pattern: /(?:==|!=)\s*"[^"]*"|"[^"]*"\s*(?:==|!=)/g,
+      suggestion: 'Compare String contents using .equals() instead of == or != operator.'
+    },
+    {
+      code: 'EMPTY_CATCH',
+      pattern: /\bcatch\s*\([^)]*\)\s*\{\s*\}/g,
+      suggestion: 'Empty catch block silently swallows exceptions; at least log or handle them.'
+    },
+    {
+      code: 'DIV_ZERO',
+      pattern: /(?:\/|%)\s*0\b(?!\.)/g,
+      suggestion: 'Division or modulo by literal zero causes fatal ArithmeticException at runtime.'
+    },
+    {
+      code: 'ASSIGN_IN_COND',
+      pattern: /\b(?:if|while)\s*\([^=)]*=(?!=)[^)]*\)/g,
+      suggestion: 'Assignment operator (=) used inside condition expression; use comparison (==).'
+    },
+    {
+      code: 'MISSING_OVERRIDE',
+      pattern: /\b(?:public|protected)\s+(?:String\s+toString|boolean\s+equals|int\s+hashCode|void\s+doGet|void\s+doPost)\s*\([^)]*\)\s*\{/g,
+      suggestion: 'Standard framework/Object method should be annotated with @Override.'
     }
   ];
 
@@ -95,6 +125,10 @@ function runStaticRules(source, rules) {
         const before = source.slice(0, match.index);
         const prefix = before.trimEnd();
         if (/(?:\/\*\*?[\s\S]*?\*\/|\/\/[^\n]*)\s*$/.test(prefix) || /@Override\s*$/.test(prefix)) continue;
+      }
+      if (check.code === 'MISSING_OVERRIDE') {
+        const before = source.slice(0, match.index);
+        if (/@Override\s*$/.test(before.trimEnd())) continue;
       }
       if (check.code === 'LONG_METHOD' || check.code === 'DUPLICATE_CODE') continue;
       addFinding(findings, rule, source, lineAt(source, match.index), check.suggestion);
@@ -118,8 +152,7 @@ function runStaticRules(source, rules) {
     if (depth !== 0) continue;
     const body = scrubbed.slice(openBrace + 1, end);
     const lineCount = lineAt(scrubbed, end) - lineAt(scrubbed, openBrace);
-    const name = match[0].match(/[A-Za-z_$][\w$]*\s*\([^)]*\)\s*\{$/)?.[0] ?? match[0];
-    methodRanges.push({ start: match.index, end, body, lineCount, name });
+    methodRanges.push({ start: match.index, end, body, lineCount });
     const longRule = findRule(rules, 'LONG_METHOD');
     if (longRule && lineCount > 40) {
       addFinding(findings, longRule, source, lineAt(source, match.index), `Method spans ${lineCount} lines; ${longRule.description || 'split it into smaller methods.'}`);
@@ -142,6 +175,13 @@ function runStaticRules(source, rules) {
   return findings;
 }
 
+const SYSTEM_PROMPT = `You are an expert Java Teaching Assistant in the AITA (AI Teaching Assistant) system for PRJ301.
+Review the provided static analysis rule violations and student Java source code.
+For each detected issue, provide an educational feedback response containing:
+1. Explain WHY the issue occurs and the risks (e.g. infinite loop hanging JVM, == comparing memory references instead of string value, division by zero crashing app, resource leaks exhausting connection pool).
+2. Clear recommendation on HOW to fix it with a concise, clean code snippet.
+Maintain a supportive, pedagogical tone suitable for undergraduate students. Do not alter or assign numeric grades.`;
+
 async function requestExternalFeedback(source, findings) {
   const provider = (process.env.AI_PROVIDER ?? 'disabled').toLowerCase();
   if (provider === 'openai' && process.env.OPENAI_API_KEY) {
@@ -155,7 +195,7 @@ async function requestExternalFeedback(source, findings) {
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'Review Java source for learning. Explain issues briefly. Do not assign or change the numeric grade.' },
+          { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: JSON.stringify({ findings, source }) }
         ],
         temperature: 0.2
@@ -173,7 +213,7 @@ async function requestExternalFeedback(source, findings) {
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(15000),
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: 'Review Java source for learning. Explain issues briefly. Do not assign or change the numeric grade.' }] },
+        systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
         contents: [{ parts: [{ text: JSON.stringify({ findings, source }) }] }]
       })
     });

@@ -5,3 +5,12 @@ ruleId,ruleCode,ruleName,severity,penaltyPoints,description
 4,COMMENT,MissingComment,Low,0.5,Add concise comments or Javadoc to public methods
 5,LONG_METHOD,LongMethod,Medium,1.0,Keep methods at 40 source lines or fewer
 6,DUPLICATE_CODE,DuplicateCode,Medium,1.5,Extract repeated method bodies into shared helpers
+7,INF_LOOP,InfiniteLoop,Critical,4.0,Potential infinite loop without break or condition update
+8,STR_EQ,StringEqualityComparison,High,2.0,Comparing String with == or != instead of .equals()
+9,EMPTY_CATCH,EmptyCatchBlock,Medium,1.5,Empty catch block silently swallowing exceptions
+10,RES_LEAK,UnclosedResource,High,2.5,Unclosed AutoCloseable resource without try-with-resources
+11,DIV_ZERO,DivisionByZero,Critical,3.0,Division or modulo by literal zero causes ArithmeticException
+12,ASSIGN_IN_COND,AssignmentInCondition,High,2.0,Assignment operator (=) used inside conditional expression instead of comparison (==)
+13,DEAD_CODE,UnreachableCode,Medium,1.5,Unreachable statement detected after return or break
+14,MISSING_OVERRIDE,MissingOverrideAnnotation,Low,0.5,Standard override method missing @Override annotation
+15,EQUALS_HASHCODE,EqualsWithoutHashCode,Medium,1.5,Class overrides equals() but fails to override hashCode()

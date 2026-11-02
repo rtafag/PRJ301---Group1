@@ -66,6 +66,18 @@ public class DataGenerator {
             bw.write("1,NPE,NullPointerException,High,2.0,Avoid returning null without check\n");
             bw.write("2,OOM,OutOfMemoryError,Critical,5.0,Memory leak detected in loop\n");
             bw.write("3,CS,CodeStyle,Low,0.5,Variable naming convention violation\n");
+            bw.write("4,COMMENT,MissingComment,Low,0.5,Add concise comments or Javadoc to public methods\n");
+            bw.write("5,LONG_METHOD,LongMethod,Medium,1.0,Keep methods at 40 source lines or fewer\n");
+            bw.write("6,DUPLICATE_CODE,DuplicateCode,Medium,1.5,Extract repeated method bodies into shared helpers\n");
+            bw.write("7,INF_LOOP,InfiniteLoop,Critical,4.0,Potential infinite loop without break or condition update\n");
+            bw.write("8,STR_EQ,StringEqualityComparison,High,2.0,Comparing String with == or != instead of .equals()\n");
+            bw.write("9,EMPTY_CATCH,EmptyCatchBlock,Medium,1.5,Empty catch block silently swallowing exceptions\n");
+            bw.write("10,RES_LEAK,UnclosedResource,High,2.5,Unclosed AutoCloseable resource without try-with-resources\n");
+            bw.write("11,DIV_ZERO,DivisionByZero,Critical,3.0,Division or modulo by literal zero causes ArithmeticException\n");
+            bw.write("12,ASSIGN_IN_COND,AssignmentInCondition,High,2.0,Assignment operator (=) used inside conditional expression instead of comparison (==)\n");
+            bw.write("13,DEAD_CODE,UnreachableCode,Medium,1.5,Unreachable statement detected after return or break\n");
+            bw.write("14,MISSING_OVERRIDE,MissingOverrideAnnotation,Low,0.5,Standard override method missing @Override annotation\n");
+            bw.write("15,EQUALS_HASHCODE,EqualsWithoutHashCode,Medium,1.5,Class overrides equals() but fails to override hashCode()\n");
         } catch (Exception e) {
         }
 
@@ -97,7 +109,7 @@ public class DataGenerator {
                 bwAnal.write(String.format("%d,%s,{},AI looks good,150\n", i, subId));
 
                 if (deduction > 0) {
-                    int rId = 1 + rand.nextInt(3);
+                    int rId = 1 + rand.nextInt(15);
                     bwVio.write(String.format("%d,%d,%d,Main.java,%d,Fix this issue\n", violationId++, i, rId,
                             10 + rand.nextInt(100)));
                 }

@@ -44,6 +44,7 @@ import java.util.Set;
 public class AppController implements ConsoleView.MenuActions {
     private final ConsoleDataStore store = new ConsoleDataStore();
     private final ConsoleView view = new ConsoleView();
+    private final com.group1.rule.ASTRuleEngine ruleEngine = new com.group1.rule.ASTRuleEngine();
     private Users currentUser;
 
     public void run() {
@@ -497,67 +498,8 @@ public class AppController implements ConsoleView.MenuActions {
     }
 
     private AnalysisOutcome analyzeJava(String source) {
-        AnalysisOutcome result = new AnalysisOutcome();
-        CompilationUnit unit;
-        try {
-            unit = StaticJavaParser.parse(source);
-        } catch (ParseProblemException exception) {
-            result.syntaxValid = false;
-            String message = exception.getMessage();
-            result.feedback = "Java syntax could not be parsed. "
-                    + (message == null ? "Check the submitted source." : message.split("\\n", 2)[0]);
-            return result;
-        }
-        result.syntaxValid = true;
         List<RuleDefinition> rules = store.readRules();
-        result.classCount = unit.findAll(ClassOrInterfaceDeclaration.class).size();
-        result.methodCount = unit.findAll(MethodDeclaration.class).size();
-        Set<String> seen = new HashSet<>();
-        for (ClassOrInterfaceDeclaration type : unit.findAll(ClassOrInterfaceDeclaration.class)) {
-            String name = type.getNameAsString();
-            if (!name.isEmpty() && Character.isLowerCase(name.charAt(0)))
-                addFinding(result, rules, seen, "CS", type, "Use an uppercase initial letter for Java class names.");
-        }
-        for (ReturnStmt statement : unit.findAll(ReturnStmt.class)) {
-            if (statement.getExpression().isPresent() && statement.getExpression().get() instanceof NullLiteralExpr)
-                addFinding(result, rules, seen, "NPE", statement, "Avoid returning null without checking the result.");
-        }
-        List<Node> loops = new ArrayList<>();
-        loops.addAll(unit.findAll(ForStmt.class));
-        loops.addAll(unit.findAll(ForEachStmt.class));
-        loops.addAll(unit.findAll(WhileStmt.class));
-        loops.addAll(unit.findAll(DoStmt.class));
-        for (Node loop : loops) {
-            for (ArrayCreationExpr array : loop.findAll(ArrayCreationExpr.class))
-                addFinding(result, rules, seen, "OOM", array, "Review repeated array allocation inside a loop.");
-        }
-        for (Finding finding : result.findings)
-            result.deduction += finding.rule.penaltyPoints;
-        result.deduction = Math.min(10, result.deduction);
-        if (result.findings.isEmpty())
-            result.feedback = "AST parsing completed. No configured rule violations were found.";
-        else {
-            StringBuilder text = new StringBuilder("Rule Engine found ").append(result.findings.size())
-                    .append(" issue(s): ");
-            for (int index = 0; index < result.findings.size(); index++) {
-                if (index > 0)
-                    text.append("; ");
-                Finding finding = result.findings.get(index);
-                text.append(finding.rule.ruleCode).append(" at line ").append(finding.line);
-            }
-            result.feedback = text.toString();
-        }
-        return result;
-    }
-
-    private void addFinding(AnalysisOutcome outcome, List<RuleDefinition> rules, Set<String> seen,
-            String code, Node node, String suggestion) {
-        RuleDefinition rule = findRule(rules, code);
-        if (rule == null)
-            return;
-        int line = node.getBegin().isPresent() ? node.getBegin().get().line : 1;
-        if (seen.add(rule.ruleId + ":" + line))
-            outcome.findings.add(new Finding(rule, line, suggestion));
+        return ruleEngine.analyze(source, rules);
     }
 
     private void printViolations(AnalysisResult analysis) {
