@@ -1,15 +1,33 @@
 package com.group1.model;
 
 import java.io.Serializable;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
+@Entity
+@Table(name = "RuleDefinition")
 public class RuleDefinition implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    @Id
+    @Column(name = "rule_id", nullable = false)
     public int ruleId;
+
+    @Column(name = "rule_code", length = 50)
     public String ruleCode;
+
+    @Column(name = "rule_name", length = 200)
     public String ruleName;
+
+    @Column(name = "severity", length = 50)
     public String severity;
+
+    @Column(name = "penalty_points")
     public float penaltyPoints;
+
+    @Column(name = "description")
     public String description;
 
     public RuleDefinition() {
