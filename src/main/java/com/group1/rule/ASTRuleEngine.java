@@ -10,6 +10,7 @@ import com.group1.model.AnalysisOutcome;
 import com.group1.model.Finding;
 import com.group1.model.RuleDefinition;
 import com.group1.rule.visitor.*;
+import com.group1.service.AIService;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -100,15 +101,8 @@ public class ASTRuleEngine {
         if (outcome.findings.isEmpty()) {
             outcome.feedback = "AST analysis completed successfully. No configured rule violations detected.";
         } else {
-            StringBuilder sb = new StringBuilder("Rule Engine detected ")
-                    .append(outcome.findings.size())
-                    .append(" issue(s): ");
-            for (int i = 0; i < outcome.findings.size(); i++) {
-                if (i > 0) sb.append("; ");
-                Finding f = outcome.findings.get(i);
-                sb.append(f.rule.ruleCode).append(" at line ").append(f.line);
-            }
-            outcome.feedback = sb.toString();
+            // Generate intelligent pedagogical feedback via OpenAI, Gemini, or Local Rule Explanation Engine
+            outcome.feedback = AIService.getInstance().generateFeedback(sourceCode, outcome.findings);
         }
 
         return outcome;
