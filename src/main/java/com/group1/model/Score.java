@@ -1,15 +1,33 @@
 package com.group1.model;
 
 import java.io.Serializable;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
+@Entity
+@Table(name = "Score")
 public class Score implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    @Id
+    @Column(name = "score_id", nullable = false)
     public int scoreId;
+
+    @Column(name = "submission_id", length = 50)
     public String submissionId;
+
+    @Column(name = "total_score")
     public float totalScore;
+
+    @Column(name = "deduction")
     public float deduction;
+
+    @Column(name = "grading_notes")
     public String gradingNotes;
+
+    @Column(name = "updated_at")
     public String updatedAt;
 
     public Score() {
