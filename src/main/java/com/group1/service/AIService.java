@@ -13,7 +13,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Properties;
 
 public class AIService {
 
@@ -75,11 +74,13 @@ public class AIService {
 
     /**
      * Generates pedagogical AI feedback for code analysis findings.
-     * If external API is disabled or fails, falls back gracefully to structured local explanation.
+     * Uses strict Anti-Hallucination prompt engineering.
+     * If external API is disabled or fails, falls back gracefully to structured local Markdown explanation.
      */
     public String generateFeedback(String sourceCode, List<Finding> findings) {
         if (findings == null || findings.isEmpty()) {
-            return "AST analysis completed successfully. No rule violations were found in this submission.";
+            return "## ✅ Kết quả đánh giá: Xuất sắc (10.0 / 10.0)\n\n" +
+                   "Hệ thống phân tích AST không tìm thấy bất kỳ lỗi logic, vi phạm quy chuẩn hay rò rỉ tài nguyên nào. Mã nguồn tuân thủ tốt các quy chuẩn Clean Code của môn PRJ301.";
         }
 
         String provider = getProperty("AI_PROVIDER", "disabled").toLowerCase();
@@ -114,8 +115,21 @@ public class AIService {
             }
         }
 
-        // Default: Intelligent structured local pedagogical explanation
+        // Default: Intelligent structured local pedagogical explanation in Markdown
         return buildLocalExplanation(sourceCode, findings);
+    }
+
+    private String getSystemPrompt() {
+        return "You are an expert Java Teaching Assistant in the AITA (AI Teaching Assistant) system for PRJ301.\n" +
+               "Your objective is to provide professional, pedagogical code feedback in GitHub-flavored Markdown.\n" +
+               "STRICT CONSTRAINTS (To eliminate hallucination & false positives):\n" +
+               "1. Base your review ONLY on the exact AST violations and line numbers provided. Do NOT invent or assume non-existent syntax or compiler errors.\n" +
+               "2. Do NOT alter, recalculate, or assign any numeric grades or penalties.\n" +
+               "3. For EACH detected violation, structure your feedback clearly with:\n" +
+               "   - **Root Cause & Runtime Impact**: Explain clearly why this is problematic (e.g. CPU thread exhaustion, identity vs value comparison, crash at runtime, unclosed DB connection pool exhaustion).\n" +
+               "   - **Recommended Fix & Code Snippet**: Provide a concise before/after code snippet showing how to refactor correctly.\n" +
+               "   - **Best Practice Tip**: A practical takeaway referencing Java or PRJ301 standards (e.g. Effective Java, SonarQube).\n" +
+               "4. Use a constructive, pedagogical tone in Vietnamese for Vietnamese undergraduate students.";
     }
 
     private String callOpenAI(String sourceCode, List<Finding> findings, String apiKey) throws Exception {
@@ -129,11 +143,7 @@ public class AIService {
         conn.setReadTimeout(20000);
         conn.setDoOutput(true);
 
-        String systemPrompt = "You are an expert Java Teaching Assistant (AITA system) for PRJ301. " +
-                "Review the detected static analysis violations and Java code snippets. " +
-                "For each violation, provide: 1) Root cause & risk explanation; 2) Concrete code fix recommendation. " +
-                "Keep tone educational and concise. Do not assign or change numeric grades.";
-
+        String systemPrompt = getSystemPrompt();
         String userPrompt = buildPromptContext(sourceCode, findings);
 
         String payload = "{" +
@@ -169,11 +179,7 @@ public class AIService {
         conn.setReadTimeout(20000);
         conn.setDoOutput(true);
 
-        String systemPrompt = "You are an expert Java Teaching Assistant (AITA system) for PRJ301. " +
-                "Review the detected static analysis violations and Java code snippets. " +
-                "For each violation, provide: 1) Root cause & risk explanation; 2) Concrete code fix recommendation. " +
-                "Keep tone educational and concise. Do not assign or change numeric grades.";
-
+        String systemPrompt = getSystemPrompt();
         String userPrompt = buildPromptContext(sourceCode, findings);
 
         String payload = "{" +
@@ -197,20 +203,21 @@ public class AIService {
 
     public String buildPromptContext(String sourceCode, List<Finding> findings) {
         StringBuilder sb = new StringBuilder();
-        sb.append("Detected Violations (").append(findings.size()).append("):\n");
+        sb.append("Danh sách vi phạm do AST Rule Engine phát hiện (").append(findings.size()).append(" lỗi):\n");
         for (int i = 0; i < findings.size(); i++) {
             Finding f = findings.get(i);
             sb.append(i + 1).append(". [").append(f.rule.ruleCode).append("] ")
-              .append(f.rule.ruleName).append(" at line ").append(f.line)
-              .append(" (Severity: ").append(f.rule.severity).append("): ")
+              .append(f.rule.ruleName).append(" (Dòng ").append(f.line)
+              .append(", Mức độ: ").append(f.rule.severity)
+              .append(", Trừ: ").append(f.rule.penaltyPoints).append("đ): ")
               .append(f.suggestion).append("\n");
         }
-        sb.append("\nSource Code Snippet around flagged lines:\n");
+        sb.append("\nTrích đoạn mã nguồn ngữ cảnh xung quanh dòng bị lỗi:\n");
         String[] lines = sourceCode.split("\n");
         for (Finding f : findings) {
             int start = Math.max(0, f.line - 3);
             int end = Math.min(lines.length - 1, f.line + 2);
-            sb.append("--- Around Line ").append(f.line).append(" (Rule ").append(f.rule.ruleCode).append(") ---\n");
+            sb.append("--- Ngữ cảnh Dòng ").append(f.line).append(" (Rule: ").append(f.rule.ruleCode).append(") ---\n");
             for (int l = start; l <= end; l++) {
                 sb.append(l + 1 == f.line ? ">> " : "   ")
                   .append(l + 1).append(": ").append(lines[l]).append("\n");
@@ -221,57 +228,87 @@ public class AIService {
 
     public String buildLocalExplanation(String sourceCode, List<Finding> findings) {
         StringBuilder sb = new StringBuilder();
-        sb.append("[AITA AI Explanation - Pedagogical Feedback]\n");
-        sb.append("Phát hiện ").append(findings.size()).append(" vấn đề trong mã nguồn bài nộp:\n\n");
+        sb.append("## 🎓 Báo cáo Hướng dẫn & Diễn giải Chi tiết (AITA AI Feedback)\n\n");
+        sb.append("> Hệ thống phân tích tĩnh AST đã phát hiện **").append(findings.size())
+          .append(" vấn đề** trong bài nộp. Dưới đây là phân tích chi tiết và giải pháp khắc phục chuẩn:\n\n");
 
         for (int i = 0; i < findings.size(); i++) {
             Finding f = findings.get(i);
-            sb.append(i + 1).append(". [").append(f.rule.ruleCode).append("] ")
-              .append(f.rule.ruleName).append(" (Dòng ").append(f.line)
-              .append(", Mức độ: ").append(f.rule.severity)
-              .append(", Trừ: ").append(f.rule.penaltyPoints).append("đ)\n");
+            sb.append("### ").append(i + 1).append(". [").append(f.rule.ruleCode).append("] ")
+              .append(f.rule.ruleName).append(" (Dòng ").append(f.line).append(")\n");
+            sb.append("- **Mức độ nghiêm trọng:** `").append(f.rule.severity).append("` (Khấu trừ: -")
+              .append(f.rule.penaltyPoints).append(" điểm)\n");
 
-            sb.append("   * Nguyên nhân & Nguy cơ: ");
+            sb.append("- **Nguyên nhân & Nguy cơ:** ");
             sb.append(getPedagogicalRisk(f.rule.ruleCode)).append("\n");
 
-            sb.append("   * Gợi ý khắc phục: ");
-            sb.append(f.suggestion).append("\n\n");
+            sb.append("- **Gợi ý khắc phục:** ").append(f.suggestion).append("\n");
+
+            String snippet = getCodeSampleForFix(f.rule.ruleCode);
+            if (!snippet.isEmpty()) {
+                sb.append("- **Mẫu code sửa chuẩn:**\n```java\n").append(snippet).append("\n```\n");
+            }
+            sb.append("\n");
         }
+        sb.append("---\n*Lời khuyên từ AITA:* Hãy rà soát lại các điểm cảnh báo trên trước khi nộp bài bảo vệ để đảm bảo mã nguồn đạt chuẩn Clean Code và không gặp sự cố runtime!");
         return sb.toString().trim();
     }
 
     private String getPedagogicalRisk(String ruleCode) {
         switch (ruleCode) {
             case "INF_LOOP":
-                return "Vòng lặp không có điều kiện dừng sẽ chiếm dụng 100% CPU thread, làm treo Servlet container và nghẽn hệ thống.";
+                return "Vòng lặp không có điều kiện thoát sẽ chiếm dụng 100% CPU thread, gây đóng băng máy chủ Servlet và nghẽn toàn bộ hệ thống.";
             case "STR_EQ":
-                return "Toán tử '==' so sánh địa chỉ vùng nhớ, không so sánh nội dung chuỗi. Khi so sánh chuỗi nhập vào với hằng số sẽ luôn trả về false.";
+                return "Toán tử '==' chỉ so sánh địa chỉ tham chiếu (vùng nhớ), không so sánh nội dung chuỗi. Khi so sánh dữ liệu nhập vào sẽ luôn trả về false.";
             case "EMPTY_CATCH":
-                return "Khối catch để rỗng nuốt chửng lỗi (Swallowed Exception), khiến lỗi logic không được ghi nhận và ứng dụng chết âm thầm.";
+                return "Khối catch rỗng nuốt chửng ngoại lệ (Swallowed Exception), khiến lỗi runtime không được ghi nhận và ứng dụng chết âm thầm khó debug.";
             case "RES_LEAK":
-                return "Mở Connection/PreparedStatement/Stream mà không đóng sẽ gây rò rỉ tài nguyên, làm cạn kiệt Connection Pool của Database.";
+                return "Mở Connection/PreparedStatement mà không đóng sẽ gây rò rỉ tài nguyên, làm cạn kiệt Connection Pool của SQL Server.";
             case "DIV_ZERO":
-                return "Chia cho số 0 gây lỗi ngoại lệ ArithmeticException nghiêm trọng ngay trong thời gian thực thi (Runtime Crash).";
+                return "Phép chia cho số 0 gây ngoại lệ ArithmeticException nghiêm trọng ngay trong thời gian thực thi (Runtime Crash).";
             case "ASSIGN_IN_COND":
-                return "Dùng phép gán '=' trong điều kiện sẽ làm thay đổi giá trị của biến thay vì so sánh, dẫn đến nhánh rẽ chạy sai hoàn toàn.";
+                return "Dùng phép gán '=' trong biểu thức điều kiện làm thay đổi giá trị biến ngoài ý muốn thay vì so sánh.";
             case "DEAD_CODE":
-                return "Mã nằm sau return/throw không bao giờ được thực thi, thể hiện logic bị lỗi hoặc copy-paste thừa thãi.";
+                return "Mã nằm sau return/throw không bao giờ được chạm tới, thể hiện logic bị lỗi hoặc code thừa thãi.";
             case "MISSING_OVERRIDE":
-                return "Thiếu @Override trên các hàm tiêu chuẩn (doGet, doPost, equals, toString) dễ dẫn đến lỗi gõ sai tên method mà không được IDE báo lỗi.";
+                return "Thiếu @Override trên các hàm tiêu chuẩn (doGet, doPost, equals, toString) dễ dẫn đến lỗi gõ sai chữ hoa/thường biến thành method overload mới.";
             case "EQUALS_HASHCODE":
-                return "Ghi đè equals mà quên hashCode vi phạm hợp đồng Object của Java, khiến việc lưu/tìm kiếm trong HashMap, HashSet bị sai kết quả.";
+                return "Ghi đè equals mà quên hashCode vi phạm hợp đồng Object của Java, khiến việc lưu/tìm trong HashMap, HashSet bị sai kết quả.";
             case "NPE":
-                return "Hàm trả về null trực tiếp mà không có cơ chế kiểm tra dễ dẫn đến lỗi NullPointerException cho người gọi hàm.";
+                return "Hàm trả về null trực tiếp mà không có kiểm tra dễ dẫn đến lỗi NullPointerException cho các module gọi hàm.";
             case "OOM":
                 return "Khởi tạo mảng mới liên tục trong vòng lặp tiêu tốn nhiều bộ nhớ Heap, có thể gây lỗi OutOfMemoryError.";
             case "CS":
-                return "Tên class/interface không tuân thủ quy tắc viết hoa chữ cái đầu (PascalCase) trong chuẩn Java Convention.";
+                return "Tên class/interface không tuân thủ quy tắc viết hoa chữ cái đầu (PascalCase) trong Java Convention.";
             case "LONG_METHOD":
-                return "Method quá dài (>40 dòng) vi phạm nguyên lý Single Responsibility, gây khó khăn cho việc bảo trì và đọc hiểu code.";
+                return "Method quá dài (>40 dòng) vi phạm nguyên lý Single Responsibility, gây khó khăn cho việc bảo trì.";
             case "COMMENT":
-                return "Method public thiếu Javadoc chú thích mục đích hàm, các tham số đầu vào và kiểu dữ liệu trả về.";
+                return "Method public thiếu Javadoc chú thích mục đích hàm, các tham số đầu vào và giá trị trả về.";
             default:
                 return "Vi phạm quy chuẩn chất lượng mã nguồn Java.";
+        }
+    }
+
+    private String getCodeSampleForFix(String ruleCode) {
+        switch (ruleCode) {
+            case "INF_LOOP":
+                return "// Sửa: Thêm biến điều kiện hoặc lệnh break\nwhile (isRunning) {\n    if (hasCompleted()) break;\n    processData();\n}";
+            case "STR_EQ":
+                return "// Sửa: Dùng .equals() hoặc Objects.equals()\nif (\"admin\".equals(role)) {\n    grantAccess();\n}";
+            case "EMPTY_CATCH":
+                return "// Sửa: Ít nhất phải log lỗi hoặc ném tiếp ngoại lệ\n} catch (SQLException e) {\n    logger.log(Level.SEVERE, \"Database query failed\", e);\n    throw new ServletException(e);\n}";
+            case "RES_LEAK":
+                return "// Sửa: Dùng try-with-resources để tự động đóng kết nối\ntry (Connection conn = DBConnection.getConnection();\n     PreparedStatement ps = conn.prepareStatement(sql)) {\n    // Thao tác DB an toàn...\n}";
+            case "DIV_ZERO":
+                return "// Sửa: Thêm guard clause kiểm tra mẫu số khác 0\nif (divisor != 0) {\n    int result = total / divisor;\n}";
+            case "ASSIGN_IN_COND":
+                return "// Sửa: Dùng toán tử so sánh == thay vì phép gán =\nif (status == 1) {\n    // ...\n}";
+            case "MISSING_OVERRIDE":
+                return "// Sửa: Thêm annotation @Override\n@Override\npublic String toString() {\n    return \"User: \" + username;\n}";
+            case "EQUALS_HASHCODE":
+                return "// Sửa: Cùng override cả equals và hashCode\n@Override\npublic boolean equals(Object o) { ... }\n\n@Override\npublic int hashCode() { return Objects.hash(id); }";
+            default:
+                return "";
         }
     }
 

@@ -6,6 +6,9 @@ import com.group1.model.RuleDefinition;
 import com.group1.service.AIService;
 import com.group1.util.CSVHelper;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 
 public class RuleEngineBenchmark {
@@ -17,14 +20,49 @@ public class RuleEngineBenchmark {
         System.out.println("================================================================================\n");
 
         List<RuleDefinition> rules = CSVHelper.readRuleDefinitions("data/rule_definition.csv");
+        ASTRuleEngine engine = new ASTRuleEngine();
+
+        // If a file argument is provided, analyze that specific file directly!
+        if (args.length > 0) {
+            String filePath = args[0];
+            System.out.println(">>> RUNNING LIVE ANALYSIS ON DEMO FILE: " + filePath + " <<<\n");
+            try {
+                byte[] bytes = Files.readAllBytes(Paths.get(filePath));
+                String source = new String(bytes, StandardCharsets.UTF_8);
+                long start = System.currentTimeMillis();
+                AnalysisOutcome outcome = engine.analyze(source, rules);
+                long elapsed = System.currentTimeMillis() - start;
+
+                System.out.println("================================================================================");
+                System.out.printf("  FILE: %s%n", filePath);
+                System.out.printf("  Syntax Valid: %b | Execution Time: %d ms%n", outcome.syntaxValid, elapsed);
+                System.out.printf("  Score: %.1f / 10.0 | Deduction: -%.1f pts | Violations: %d%n",
+                        Math.max(0.0f, 10.0f - outcome.deduction), outcome.deduction, outcome.findings.size());
+                System.out.println("================================================================================");
+
+                if (!outcome.findings.isEmpty()) {
+                    System.out.println("\n[DETAILED AST FINDINGS]:");
+                    for (Finding f : outcome.findings) {
+                        System.out.printf("  * Line %2d | [%-16s] %-8s (-%.1f pts) -> %s%n",
+                                f.line, f.rule.ruleCode, f.rule.severity, f.rule.penaltyPoints, f.suggestion);
+                    }
+                }
+
+                System.out.println("\n" + outcome.feedback);
+                System.out.println("\n================================================================================\n");
+                return;
+            } catch (Exception e) {
+                System.err.println("Error reading or analyzing file: " + e.getMessage());
+                return;
+            }
+        }
+
         System.out.println("Loaded " + rules.size() + " active rule definitions from data/rule_definition.csv:\n");
         for (RuleDefinition r : rules) {
             System.out.printf("  [%-16s] (ID: %2d) Severity: %-8s Penalty: %.1f | %s%n",
                     r.ruleCode, r.ruleId, r.severity, r.penaltyPoints, r.description);
         }
         System.out.println();
-
-        ASTRuleEngine engine = new ASTRuleEngine();
 
         // TEST 1: Clean code without any violations
         String cleanCode =

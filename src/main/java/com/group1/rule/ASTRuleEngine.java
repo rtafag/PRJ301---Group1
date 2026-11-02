@@ -44,6 +44,7 @@ public class ASTRuleEngine {
         visitors.add(new NamingConventionVisitor());
         visitors.add(new LongMethodVisitor());
         visitors.add(new MissingCommentVisitor());
+        visitors.add(new DuplicateCodeVisitor());
     }
 
     public AnalysisOutcome analyze(String sourceCode, List<RuleDefinition> configuredRules) {
