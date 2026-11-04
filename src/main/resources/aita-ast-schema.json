@@ -1,0 +1,297 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aita.fpt.local/schemas/ast-1.0.json",
+  "title": "AITA AST Core output",
+  "type": "object",
+  "required": ["schemaVersion", "engine", "summary", "files", "project"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": "1.0" },
+    "engine": {
+      "type": "object",
+      "required": ["name", "version", "parser"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "version": { "type": "string" },
+        "parser": { "type": "string" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "syntaxValid", "fileCount", "parsedFileCount", "skippedFileCount", "typeCount", "methodCount",
+        "constructorCount", "fieldCount", "loopCount", "infiniteLoopCandidateCount", "nullReturnCount",
+        "loopAllocationCount", "totalLines", "nodeCount", "maxCyclomaticComplexity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "syntaxValid": { "type": "boolean" },
+        "fileCount": { "$ref": "#/definitions/count" },
+        "parsedFileCount": { "$ref": "#/definitions/count" },
+        "skippedFileCount": { "$ref": "#/definitions/count" },
+        "typeCount": { "$ref": "#/definitions/count" },
+        "methodCount": { "$ref": "#/definitions/count" },
+        "constructorCount": { "$ref": "#/definitions/count" },
+        "fieldCount": { "$ref": "#/definitions/count" },
+        "loopCount": { "$ref": "#/definitions/count" },
+        "infiniteLoopCandidateCount": { "$ref": "#/definitions/count" },
+        "nullReturnCount": { "$ref": "#/definitions/count" },
+        "loopAllocationCount": { "$ref": "#/definitions/count" },
+        "totalLines": { "$ref": "#/definitions/count" },
+        "nodeCount": { "$ref": "#/definitions/count" },
+        "maxCyclomaticComplexity": { "$ref": "#/definitions/count" }
+      }
+    },
+    "files": { "type": "array", "items": { "$ref": "#/definitions/file" } },
+    "project": {
+      "type": "object",
+      "required": [
+        "classIndex", "dependencies", "duplicateTypes", "unresolvedImports", "duplicateMethodBodies",
+        "skippedFiles"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "classIndex": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["qualifiedName", "kind", "file"],
+            "additionalProperties": false,
+            "properties": {
+              "qualifiedName": { "type": "string" },
+              "kind": { "$ref": "#/definitions/typeKind" },
+              "file": { "type": "string" }
+            }
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["from", "to", "kind"],
+            "additionalProperties": false,
+            "properties": {
+              "from": { "type": "string" },
+              "to": { "type": "string" },
+              "kind": { "enum": ["extends", "implements", "field", "parameter", "return", "creation"] }
+            }
+          }
+        },
+        "duplicateTypes": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["qualifiedName", "files"],
+            "additionalProperties": false,
+            "properties": {
+              "qualifiedName": { "type": "string" },
+              "files": { "type": "array", "items": { "type": "string" }, "minItems": 2 }
+            }
+          }
+        },
+        "unresolvedImports": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["file", "import"],
+            "additionalProperties": false,
+            "properties": { "file": { "type": "string" }, "import": { "type": "string" } }
+          }
+        },
+        "duplicateMethodBodies": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["fingerprint", "lineCount", "locations"],
+            "additionalProperties": false,
+            "properties": {
+              "fingerprint": { "type": "string" },
+              "lineCount": { "$ref": "#/definitions/count" },
+              "locations": {
+                "type": "array",
+                "minItems": 2,
+                "items": {
+                  "type": "object",
+                  "required": ["file", "line", "method"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "file": { "type": "string" },
+                    "line": { "$ref": "#/definitions/count" },
+                    "method": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "skippedFiles": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["path", "reason"],
+            "additionalProperties": false,
+            "properties": { "path": { "type": "string" }, "reason": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "count": { "type": "integer", "minimum": 0 },
+    "typeKind": { "enum": ["class", "interface", "enum", "annotation", "record"] },
+    "stringList": { "type": "array", "items": { "type": "string" } },
+    "file": {
+      "type": "object",
+      "required": [
+        "path", "syntaxValid", "lines", "nodeCount", "maxDepth", "commentCount", "package", "imports",
+        "errors", "types", "methods", "loops", "nullReturns", "loopAllocations"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string" },
+        "syntaxValid": { "type": "boolean" },
+        "lines": { "$ref": "#/definitions/count" },
+        "nodeCount": { "$ref": "#/definitions/count" },
+        "maxDepth": { "$ref": "#/definitions/count" },
+        "commentCount": { "$ref": "#/definitions/count" },
+        "package": { "type": "string" },
+        "imports": { "$ref": "#/definitions/stringList" },
+        "errors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["line", "column", "message"],
+            "additionalProperties": false,
+            "properties": {
+              "line": { "$ref": "#/definitions/count" },
+              "column": { "$ref": "#/definitions/count" },
+              "message": { "type": "string" }
+            }
+          }
+        },
+        "types": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name", "qualifiedName", "kind", "line", "endLine", "modifiers", "extends", "implements",
+              "fieldCount", "methodCount"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "qualifiedName": { "type": "string" },
+              "kind": { "$ref": "#/definitions/typeKind" },
+              "line": { "$ref": "#/definitions/count" },
+              "endLine": { "$ref": "#/definitions/count" },
+              "modifiers": { "$ref": "#/definitions/stringList" },
+              "extends": { "$ref": "#/definitions/stringList" },
+              "implements": { "$ref": "#/definitions/stringList" },
+              "fieldCount": { "$ref": "#/definitions/count" },
+              "methodCount": { "$ref": "#/definitions/count" }
+            }
+          }
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "name", "owner", "signature", "returnType", "constructor", "modifiers", "parameters", "line",
+              "endLine", "lineCount", "statementCount", "cyclomaticComplexity", "maxLoopDepth", "hasBody",
+              "hasJavadoc", "hasComment", "fingerprint"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "type": "string" },
+              "owner": { "type": "string" },
+              "signature": { "type": "string" },
+              "returnType": { "type": "string" },
+              "constructor": { "type": "boolean" },
+              "modifiers": { "$ref": "#/definitions/stringList" },
+              "parameters": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["name", "type"],
+                  "additionalProperties": false,
+                  "properties": { "name": { "type": "string" }, "type": { "type": "string" } }
+                }
+              },
+              "line": { "$ref": "#/definitions/count" },
+              "endLine": { "$ref": "#/definitions/count" },
+              "lineCount": { "$ref": "#/definitions/count" },
+              "statementCount": { "$ref": "#/definitions/count" },
+              "cyclomaticComplexity": { "type": "integer", "minimum": 1 },
+              "maxLoopDepth": { "$ref": "#/definitions/count" },
+              "hasBody": { "type": "boolean" },
+              "hasJavadoc": { "type": "boolean" },
+              "hasComment": { "type": "boolean" },
+              "fingerprint": { "type": "string" }
+            }
+          }
+        },
+        "loops": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "kind", "line", "endLine", "method", "depth", "condition", "constantTrueCondition", "hasExit",
+              "infiniteCandidate", "reason"
+            ],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["for", "foreach", "while", "do"] },
+              "line": { "$ref": "#/definitions/count" },
+              "endLine": { "$ref": "#/definitions/count" },
+              "method": { "type": "string" },
+              "depth": { "type": "integer", "minimum": 1 },
+              "condition": { "type": "string" },
+              "constantTrueCondition": { "type": "boolean" },
+              "hasExit": { "type": "boolean" },
+              "infiniteCandidate": { "type": "boolean" },
+              "reason": { "enum": ["constant-true-condition", "condition-never-updated", null] }
+            }
+          }
+        },
+        "nullReturns": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["line", "method"],
+            "additionalProperties": false,
+            "properties": { "line": { "$ref": "#/definitions/count" }, "method": { "type": "string" } }
+          }
+        },
+        "loopAllocations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "type", "line", "method"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "enum": ["array", "object"] },
+              "type": { "type": "string" },
+              "line": { "$ref": "#/definitions/count" },
+              "method": { "type": "string" }
+            }
+          }
+        },
+        "treeTruncated": { "type": "boolean" },
+        "tree": { "$ref": "#/definitions/treeNode" }
+      }
+    },
+    "treeNode": {
+      "type": "object",
+      "required": ["type", "name", "line", "children"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string" },
+        "name": { "type": "string" },
+        "line": { "$ref": "#/definitions/count" },
+        "children": { "type": "array", "items": { "$ref": "#/definitions/treeNode" } }
+      }
+    }
+  }
+}

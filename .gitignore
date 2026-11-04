@@ -3,5 +3,3 @@ target/
 .idea/
 *.iml
 .vscode/
-*.jar
-fix_sql.ps1
