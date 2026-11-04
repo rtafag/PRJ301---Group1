@@ -5,7 +5,8 @@ import ExcelJS from 'exceljs';
 import helmet from 'helmet';
 import multer from 'multer';
 import path from 'node:path';
-import { analyzeJavaSource, sha256 } from './ai-engine.js';
+import { analyzeJavaSource } from './ai-engine.js';
+import { AnalysisQueue, getRetryDelay, getSubmissionPriority } from './analysis-queue.js';
 import { createAuth, requireAuth } from './auth.js';
 import { runJavaInSandbox } from './sandbox.js';
 import { createSqlRuntimeRepository } from './sql-store.js';
@@ -20,6 +21,7 @@ const store = createStore(sqlRepository ? {
   saveRuntimeData: (runtimeData) => sqlRepository.save(runtimeData)
 } : {});
 if (sqlRepository) await sqlRepository.save(store.getRuntimeData());
+const analysisQueue = new AnalysisQueue();
 const auth = createAuth(store);
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -27,6 +29,106 @@ const upload = multer({
 });
 const studentOnly = requireAuth(auth, 'Student');
 const teacherOnly = requireAuth(auth, 'Teacher');
+let workerRunning = true;
+
+async function processAnalysisJob(job) {
+  const submission = store.findSubmission(job.submissionId);
+  if (!submission) {
+    console.error(`Analysis job ${job.submissionId} has no matching submission; discarding it.`);
+    await analysisQueue.acknowledge(job.submissionId);
+    return;
+  }
+  if (submission.analysis) {
+    await analysisQueue.acknowledge(job.submissionId);
+    return;
+  }
+
+  store.updateSubmissionStatus(job.submissionId, 'Processing');
+  await store.flushPersistence();
+  const heartbeat = setInterval(() => {
+    analysisQueue.heartbeat(job.submissionId).catch((error) => {
+      console.error(`Unable to renew analysis job ${job.submissionId}:`, error);
+    });
+  }, 30000);
+
+  try {
+    const startedAt = Date.now();
+    const analysis = await analyzeJavaSource(submission.sourceCode, store.listRules());
+    store.updateAnalysis(job.submissionId, {
+      astJson: analysis.astSummary,
+      aiFeedback: analysis.aiFeedback,
+      providerWarning: analysis.providerWarning,
+      syntaxValid: analysis.syntaxValid,
+      executionTimeMs: Date.now() - startedAt,
+      violations: analysis.violations
+    }, {
+      totalScore: analysis.totalScore,
+      deduction: analysis.deduction,
+      gradingNotes: analysis.violations.length ? 'Rule engine findings are available for review.' : 'No configured rule violations found.'
+    });
+    await store.flushPersistence();
+  } catch (error) {
+    console.error(`Analysis attempt ${job.attemptsMade}/${job.maxAttempts} failed for ${job.submissionId}:`, error);
+    if (job.attemptsMade >= job.maxAttempts) {
+      store.updateSubmissionStatus(job.submissionId, 'Analysis Failed');
+      await store.flushPersistence();
+      await analysisQueue.acknowledge(job.submissionId);
+      return;
+    }
+    store.updateSubmissionStatus(job.submissionId, 'Queued');
+    await store.flushPersistence();
+    await analysisQueue.retry(job, getRetryDelay(job.attemptsMade));
+    return;
+  } finally {
+    clearInterval(heartbeat);
+  }
+  await analysisQueue.acknowledge(job.submissionId);
+}
+
+async function runAnalysisWorker() {
+  let lastReconciliationAt = 0;
+  while (workerRunning) {
+    try {
+      const reserved = await analysisQueue.reserve();
+      if (!reserved) {
+        if (Date.now() - lastReconciliationAt >= 5000) {
+          lastReconciliationAt = Date.now();
+          for (const submission of store.listQueueFailedSubmissions()) {
+            try {
+              await analysisQueue.enqueue({
+                submissionId: submission.submissionId,
+                priority: getSubmissionPriority(
+                  submission.assignmentId
+                    ? store.findAssignment(submission.assignmentId)
+                    : null
+                )
+              });
+              store.updateSubmissionStatus(submission.submissionId, 'Queued');
+              await store.flushPersistence();
+            } catch (error) {
+              console.error(`Unable to requeue analysis for ${submission.submissionId}:`, error);
+              break;
+            }
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        continue;
+      }
+      if (reserved.type === 'failed') {
+        const submission = store.findSubmission(reserved.job.submissionId);
+        if (submission && !submission.analysis) {
+          store.updateSubmissionStatus(reserved.job.submissionId, 'Analysis Failed');
+          await store.flushPersistence();
+        }
+        continue;
+      }
+      await processAnalysisJob(reserved.job);
+    } catch (error) {
+      console.error('Analysis queue worker could not reach Redis or process a job:', error);
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
+  }
+}
 
 app.disable('x-powered-by');
 app.use(helmet({
@@ -74,9 +176,17 @@ function getOwnedSubmission(request, response) {
   return submission;
 }
 
-app.get('/api/health', (request, response) => {
-  response.json({
-    status: 'ok',
+app.get('/api/health', async (request, response) => {
+  let queueStatus = 'ready';
+  try {
+    await analysisQueue.ping();
+  } catch (error) {
+    queueStatus = 'unavailable';
+    console.error('Redis health check failed:', error);
+  }
+  response.status(queueStatus === 'ready' ? 200 : 503).json({
+    status: queueStatus === 'ready' ? 'ok' : 'degraded',
+    analysisQueue: queueStatus,
     aiProvider: process.env.AI_PROVIDER || 'disabled',
     sandboxEnabled: process.env.SANDBOX_ENABLED === 'true',
     storage: sqlRepository ? 'sqlserver' : 'json'
@@ -152,7 +262,7 @@ app.patch('/api/me/notifications/:notificationId/read', requireAuth(auth), async
 });
 
 app.post('/api/student/submissions', studentOnly, (request, response, next) => {
-  upload.single('sourceFile')(request, response, (error) => {
+  upload.single('sourceFile')(request, response, async (error) => {
     if (error) return next(error);
     if (!request.file) return response.status(400).json({ error: 'Choose a file to submit.' });
 
@@ -179,44 +289,48 @@ app.post('/api/student/submissions', studentOnly, (request, response, next) => {
       return response.status(409).json({ error: message });
     }
 
-    const startedAt = Date.now();
-    const analysisPromise = javaFile
-      ? analyzeJavaSource(sourceCode, store.listRules())
-      : Promise.resolve(null);
-    analysisPromise.then(async (analysis) => {
-      const score = analysis ? {
-        totalScore: analysis.totalScore,
-        deduction: analysis.deduction,
-        gradingNotes: analysis.violations.length ? 'Rule engine findings are available for review.' : 'No configured rule violations found.',
-        updatedAt: new Date().toISOString(),
-        manuallyEdited: false
-      } : null;
-      const submission = store.createSubmission({
-        submissionId: `SUB-${crypto.randomUUID()}`,
-        userId: request.user.userId,
-        assignmentId: assignment?.assignmentId ?? null,
-        fileName,
-        mimeType,
-        fileData: request.file.buffer.toString('base64'),
-        fileUrl: `local://${request.user.userId}/${fileName}`,
-        fileHash,
-        sourceCode,
-        status: analysis ? (analysis.syntaxValid ? 'Graded' : 'Needs Review') : 'Submitted',
-        score,
-        analysis: analysis ? {
-          astJson: analysis.astSummary,
-          aiFeedback: analysis.aiFeedback,
-          providerWarning: analysis.providerWarning,
-          syntaxValid: analysis.syntaxValid,
-          executionTimeMs: Date.now() - startedAt,
-          violations: analysis.violations
-        } : null,
-        manualFeedback: ''
-      });
+    const submissionId = `SUB-${crypto.randomUUID()}`;
+    const submission = store.createSubmission({
+      submissionId,
+      userId: request.user.userId,
+      assignmentId: assignment?.assignmentId ?? null,
+      fileName,
+      mimeType,
+      fileData: request.file.buffer.toString('base64'),
+      fileUrl: `local://${request.user.userId}/${fileName}`,
+      fileHash,
+      sourceCode,
+      status: javaFile ? 'Queued' : 'Submitted',
+      score: null,
+      analysis: null,
+      manualFeedback: ''
+    });
 
+    try {
       await store.flushPersistence();
-      return response.status(201).json({ submission: publicSubmission(submission) });
-    }).catch(next);
+      if (javaFile) {
+        await analysisQueue.enqueue({
+          submissionId,
+          priority: getSubmissionPriority(assignment)
+        });
+      }
+    } catch (error) {
+      if (javaFile) {
+        store.updateSubmissionStatus(submissionId, 'Queue Failed');
+        try {
+          await store.flushPersistence();
+        } catch (persistenceError) {
+          return next(persistenceError);
+        }
+        console.error(`Unable to enqueue analysis for ${submissionId}:`, error);
+        return response.status(503).json({
+          error: 'The submission was saved, but analysis could not be queued. The server will retry automatically.',
+          submission: publicSubmission(submission)
+        });
+      }
+      return next(error);
+    }
+    return response.status(201).json({ submission: publicSubmission(submission) });
   });
 });
 
@@ -667,7 +781,17 @@ app.use((error, request, response, next) => {
 });
 
 const port = Number(process.env.PORT) || 3000;
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`Submission Portal - AITA listening at http://localhost:${port}`);
   console.log(`Loaded ${store.users.length} demo users and ${store.listRules().length} rules.`);
+  void runAnalysisWorker();
 });
+
+async function stopServer() {
+  workerRunning = false;
+  await new Promise((resolve) => server.close(resolve));
+  await sqlRepository?.close();
+}
+
+process.once('SIGINT', () => { void stopServer(); });
+process.once('SIGTERM', () => { void stopServer(); });

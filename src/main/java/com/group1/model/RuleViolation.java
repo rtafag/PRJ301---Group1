@@ -1,33 +1,15 @@
 package com.group1.model;
 
 import java.io.Serializable;
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
 
-@Entity
-@Table(name = "RuleViolation")
 public class RuleViolation implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    @Id
-    @Column(name = "violation_id", nullable = false)
     public int violationId;
-
-    @Column(name = "analysis_id")
     public int analysisId;
-
-    @Column(name = "rule_id")
     public int ruleId;
-
-    @Column(name = "file_name", length = 200)
     public String fileName;
-
-    @Column(name = "line_number")
     public int lineNumber;
-
-    @Column(name = "suggested_fix")
     public String suggestedFix;
 
     public RuleViolation() {

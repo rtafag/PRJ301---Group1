@@ -10,8 +10,9 @@ import com.group1.model.Users;
 import com.group1.model.AnalysisOutcome;
 import com.group1.model.Finding;
 import com.group1.view.ConsoleView;
-import com.github.javaparser.ParseProblemException;
-import com.github.javaparser.StaticJavaParser;
+import com.group1.ast.AstJsonSerializer;
+import com.group1.ast.AstModel;
+import com.group1.ast.AstProjectAnalyzer;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
@@ -44,7 +45,6 @@ import java.util.Set;
 public class AppController implements ConsoleView.MenuActions {
     private final ConsoleDataStore store = new ConsoleDataStore();
     private final ConsoleView view = new ConsoleView();
-    private final com.group1.rule.ASTRuleEngine ruleEngine = new com.group1.rule.ASTRuleEngine();
     private Users currentUser;
 
     public void run() {
@@ -97,11 +97,11 @@ public class AppController implements ConsoleView.MenuActions {
 
     @Override
     public void submitSourceCode() {
-        Path source = promptForFile("Java source file path: ");
+        Path source = promptForFile("Java source path (.java or .zip): ");
         if (source == null)
             return;
-        if (!source.getFileName().toString().toLowerCase().endsWith(".java")) {
-            System.out.println("Only .java source files can be analyzed.");
+        if (!isAnalyzableSource(source)) {
+            System.out.println("Only .java source files or .zip archives of Java sources can be analyzed.");
             return;
         }
         createSubmission(source, "SourceCode", true);
@@ -142,11 +142,11 @@ public class AppController implements ConsoleView.MenuActions {
             System.out.println("Submission not found.");
             return;
         }
-        Path source = promptForFile("Replacement Java source path: ");
+        Path source = promptForFile("Replacement Java source path (.java or .zip): ");
         if (source == null)
             return;
-        if (!source.getFileName().toString().toLowerCase().endsWith(".java")) {
-            System.out.println("Only .java source files can be resubmitted for analysis.");
+        if (!isAnalyzableSource(source)) {
+            System.out.println("Only .java source files or .zip archives of Java sources can be resubmitted for analysis.");
             return;
         }
         try {
@@ -456,19 +456,20 @@ public class AppController implements ConsoleView.MenuActions {
         }
         long started = System.currentTimeMillis();
         try {
-            AnalysisOutcome outcome = analyzeJava(new String(Files.readAllBytes(source), StandardCharsets.UTF_8));
+            AstModel.ProjectAst project = new AstProjectAnalyzer().analyze(source);
+            AnalysisOutcome outcome = analyzeProject(project);
             int analysisId = store.nextAnalysisId();
             List<AnalysisResult> analyses = store.readAnalysisResults();
             analyses.add(new AnalysisResult(analysisId, submission.submissionId,
-                    "{\"classes\":" + outcome.classCount + ",\"methods\":" + outcome.methodCount
-                            + ",\"syntaxValid\":" + outcome.syntaxValid + "}",
+                    AstJsonSerializer.toJson(project, true, false),
                     outcome.feedback, (int) (System.currentTimeMillis() - started)));
             store.saveAnalysisResults(analyses);
             List<RuleViolation> violations = store.readViolations();
             int nextViolationId = store.nextViolationId();
             for (Finding finding : outcome.findings) {
                 violations.add(new RuleViolation(nextViolationId++, analysisId, finding.rule.ruleId,
-                        fileName(submission.fileUrl), finding.line, finding.suggestion));
+                        finding.file != null ? finding.file : fileName(submission.fileUrl), finding.line,
+                        finding.suggestion));
             }
             store.saveViolations(violations);
             List<Score> scores = store.readScores();
@@ -497,9 +498,92 @@ public class AppController implements ConsoleView.MenuActions {
         }
     }
 
-    private AnalysisOutcome analyzeJava(String source) {
+    private AnalysisOutcome analyzeProject(AstModel.ProjectAst project) {
+        AnalysisOutcome result = new AnalysisOutcome();
+        result.classCount = project.typeCount();
+        result.methodCount = project.methodCount();
+        if (project.files.isEmpty()) {
+            result.syntaxValid = false;
+            result.feedback = "No Java source files were found in the submission.";
+            return result;
+        }
+        if (!project.syntaxValid()) {
+            result.syntaxValid = false;
+            AstModel.SyntaxIssue issue = project.firstError();
+            result.feedback = "Java syntax could not be parsed in " + project.firstErrorFile()
+                    + (issue == null ? "." : " (line " + issue.line + "): " + issue.message);
+            return result;
+        }
+        result.syntaxValid = true;
         List<RuleDefinition> rules = store.readRules();
-        return ruleEngine.analyze(source, rules);
+        for (AstModel.FileAst file : project.files)
+            collectFindings(file, rules, result, project.files.size() > 1);
+        for (Finding finding : result.findings)
+            result.deduction += finding.rule.penaltyPoints;
+        result.deduction = Math.min(10, result.deduction);
+        if (result.findings.isEmpty())
+            result.feedback = "AST parsing completed for " + project.files.size()
+                    + " file(s). No configured rule violations were found.";
+        else {
+            StringBuilder text = new StringBuilder("Rule Engine found ").append(result.findings.size())
+                    .append(" issue(s): ");
+            for (int index = 0; index < result.findings.size(); index++) {
+                if (index > 0)
+                    text.append("; ");
+                Finding finding = result.findings.get(index);
+                text.append(finding.rule.ruleCode);
+                if (finding.file != null)
+                    text.append(" in ").append(finding.file);
+                text.append(" at line ").append(finding.line);
+            }
+            result.feedback = text.toString();
+        }
+        return result;
+    }
+
+    private void collectFindings(AstModel.FileAst file, List<RuleDefinition> rules, AnalysisOutcome result,
+            boolean multiFile) {
+        CompilationUnit unit = file.unit();
+        if (unit == null)
+            return;
+        String label = multiFile ? file.path : null;
+        Set<String> seen = new HashSet<>();
+        for (ClassOrInterfaceDeclaration type : unit.findAll(ClassOrInterfaceDeclaration.class)) {
+            String name = type.getNameAsString();
+            if (!name.isEmpty() && Character.isLowerCase(name.charAt(0)))
+                addFinding(result, rules, seen, "CS", type, "Use an uppercase initial letter for Java class names.",
+                        label);
+        }
+        for (ReturnStmt statement : unit.findAll(ReturnStmt.class)) {
+            if (statement.getExpression().isPresent() && statement.getExpression().get() instanceof NullLiteralExpr)
+                addFinding(result, rules, seen, "NPE", statement, "Avoid returning null without checking the result.",
+                        label);
+        }
+        List<Node> loops = new ArrayList<>();
+        loops.addAll(unit.findAll(ForStmt.class));
+        loops.addAll(unit.findAll(ForEachStmt.class));
+        loops.addAll(unit.findAll(WhileStmt.class));
+        loops.addAll(unit.findAll(DoStmt.class));
+        for (Node loop : loops) {
+            for (ArrayCreationExpr array : loop.findAll(ArrayCreationExpr.class))
+                addFinding(result, rules, seen, "OOM", array, "Review repeated array allocation inside a loop.",
+                        label);
+        }
+    }
+
+    private void addFinding(AnalysisOutcome outcome, List<RuleDefinition> rules, Set<String> seen,
+            String code, Node node, String suggestion, String file) {
+        RuleDefinition rule = findRule(rules, code);
+        if (rule == null)
+            return;
+        int line = node.getBegin().isPresent() ? node.getBegin().get().line : 1;
+        if (seen.add(rule.ruleId + ":" + line))
+            outcome.findings.add(new Finding(rule, line, suggestion, file));
+    }
+
+    private boolean isAnalyzableSource(Path source) {
+        String name = source.getFileName().toString().toLowerCase();
+        return name.endsWith(".java") || name.endsWith(".zip");
     }
 
     private void printViolations(AnalysisResult analysis) {
@@ -591,7 +675,8 @@ public class AppController implements ConsoleView.MenuActions {
     }
 
     private boolean isLocalJavaFile(Submission item) {
-        return item.fileUrl != null && item.fileUrl.toLowerCase().endsWith(".java") && localSourcePath(item) != null;
+        return item.fileUrl != null && (item.fileUrl.toLowerCase().endsWith(".java")
+                || item.fileUrl.toLowerCase().endsWith(".zip")) && localSourcePath(item) != null;
     }
 
     private Path localSourcePath(Submission item) {

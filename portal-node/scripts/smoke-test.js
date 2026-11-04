@@ -14,6 +14,22 @@ async function login(username, passwordHash, role) {
   return response.json();
 }
 
+async function waitForAnalysis(submissionId, authorization) {
+  const deadline = Date.now() + 15000;
+  while (Date.now() < deadline) {
+    const response = await fetch(`${baseUrl}/api/student/submissions/${submissionId}`, {
+      headers: { Authorization: authorization }
+    });
+    assert.equal(response.status, 200, 'Queued submission should remain available');
+    const { submission } = await response.json();
+    if (submission.analysis) return submission;
+    assert.notEqual(submission.status, 'Analysis Failed', 'Queued analysis should complete successfully');
+    assert.notEqual(submission.status, 'Queue Failed', 'Submission should be accepted by Redis');
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  assert.fail('Timed out waiting for Redis-backed analysis to complete.');
+}
+
 const student = await login('dungdang442', 'hash_dungdang442', 'Student');
 const classReportAttempt = await fetch(`${baseUrl}/api/teacher/report`, {
   headers: { Authorization: `Bearer ${student.token}` }
@@ -33,7 +49,9 @@ const uploadResponse = await fetch(`${baseUrl}/api/student/submissions`, {
   body: form
 });
 assert.equal(uploadResponse.status, 201, 'Student upload failed');
-const { submission } = await uploadResponse.json();
+const { submission: queuedSubmission } = await uploadResponse.json();
+assert.notEqual(queuedSubmission.status, 'Queue Failed', 'Java submission should enter the analysis queue');
+const submission = await waitForAnalysis(queuedSubmission.submissionId, `Bearer ${student.token}`);
 assert.equal(submission.analysis.syntaxValid, true);
 assert.equal(submission.analysis.violations[0].ruleCode, 'NPE');
 

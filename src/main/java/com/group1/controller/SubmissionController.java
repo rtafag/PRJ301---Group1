@@ -89,7 +89,7 @@ public class SubmissionController extends HttpServlet {
         String fileHash = sha256(archiveBytes);
         String submissionId = "SUB-" + UUID.randomUUID().toString();
         Path savedFile = null;
-        try (Connection connection = DBConnection.getConnection()) {
+        try (Connection connection = openConnection()) {
             SubmissionDAO submissionDAO = new SubmissionDAO(connection);
             if (submissionDAO.findByFileHash(fileHash) != null) {
                 response.sendError(HttpServletResponse.SC_CONFLICT, "This ZIP file has already been submitted.");
@@ -120,6 +120,10 @@ public class SubmissionController extends HttpServlet {
             removeSavedFile(savedFile);
             throw exception;
         }
+    }
+
+    protected Connection openConnection() throws SQLException {
+        return DBConnection.getConnection();
     }
 
     private static byte[] readBounded(InputStream input, long maximumSize) throws IOException {

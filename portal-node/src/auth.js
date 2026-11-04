@@ -1,50 +1,4 @@
-import { createHash, createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-
-const JWT_SECRET = process.env.JWT_SECRET || 'aita-secret-key-prj301-group1-2026';
-
-function base64UrlEncode(strOrBuffer) {
-  const buf = Buffer.isBuffer(strOrBuffer) ? strOrBuffer : Buffer.from(strOrBuffer);
-  return buf.toString('base64url');
-}
-
-function base64UrlDecode(str) {
-  return Buffer.from(str, 'base64url').toString('utf8');
-}
-
-export function signJwt(payload, secret = JWT_SECRET) {
-  const header = { alg: 'HS256', typ: 'JWT' };
-  const encodedHeader = base64UrlEncode(JSON.stringify(header));
-  const encodedPayload = base64UrlEncode(JSON.stringify(payload));
-  const data = `${encodedHeader}.${encodedPayload}`;
-  const signature = createHmac('sha256', secret).update(data).digest();
-  const encodedSignature = base64UrlEncode(signature);
-  return `${data}.${encodedSignature}`;
-}
-
-export function verifyJwt(token, secret = JWT_SECRET) {
-  if (typeof token !== 'string') return null;
-  const parts = token.split('.');
-  if (parts.length !== 3) return null;
-  const [encodedHeader, encodedPayload, encodedSignature] = parts;
-
-  const data = `${encodedHeader}.${encodedPayload}`;
-  const expectedSig = createHmac('sha256', secret).update(data).digest();
-  const providedSig = Buffer.from(encodedSignature, 'base64url');
-
-  if (expectedSig.length !== providedSig.length || !timingSafeEqual(expectedSig, providedSig)) {
-    return null;
-  }
-
-  try {
-    const payload = JSON.parse(base64UrlDecode(encodedPayload));
-    if (payload.exp && Date.now() >= payload.exp * 1000) {
-      return null;
-    }
-    return payload;
-  } catch {
-    return null;
-  }
-}
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 
 function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
@@ -65,7 +19,7 @@ function matchesPasswordHash(candidate, expected) {
 }
 
 export function createAuth(store) {
-  const revokedTokens = new Set();
+  const sessions = new Map();
   const lifetimeMs = 8 * 60 * 60 * 1000;
 
   return {
@@ -73,27 +27,15 @@ export function createAuth(store) {
       const user = store.findUser(String(username ?? '').trim());
       if (!user || !matchesPasswordHash(passwordHash ?? '', user.passwordHash)) return null;
 
-      const nowSec = Math.floor(Date.now() / 1000);
-      const expSec = nowSec + Math.floor(lifetimeMs / 1000);
-      const payload = {
-        sub: user.userId,
+      const token = randomBytes(32).toString('base64url');
+      sessions.set(token, {
         userId: user.userId,
         username: user.username,
         fullName: user.fullName,
         role: user.role,
-        iat: nowSec,
-        exp: expSec
-      };
-
-      const token = signJwt(payload);
-      const userSession = {
-        userId: user.userId,
-        username: user.username,
-        fullName: user.fullName,
-        role: user.role,
-        expiresAt: expSec * 1000
-      };
-      return { token, user: userSession };
+        expiresAt: Date.now() + lifetimeMs
+      });
+      return { token, user: sessions.get(token) };
     },
     resetPassword({ email, confirmationKey, newPassword }) {
       const password = String(newPassword ?? '');
@@ -111,21 +53,16 @@ export function createAuth(store) {
       return store.updateUserPassword(userId, hashPassword(password));
     },
     getUser(token) {
-      if (!token || revokedTokens.has(token)) return null;
-      const claims = verifyJwt(token);
-      if (!claims) return null;
-      return {
-        userId: claims.userId || claims.sub,
-        username: claims.username,
-        fullName: claims.fullName,
-        role: claims.role,
-        expiresAt: claims.exp ? claims.exp * 1000 : Date.now() + lifetimeMs
-      };
+      const session = sessions.get(token);
+      if (!session) return null;
+      if (session.expiresAt <= Date.now()) {
+        sessions.delete(token);
+        return null;
+      }
+      return session;
     },
     logout(token) {
-      if (token) {
-        revokedTokens.add(token);
-      }
+      sessions.delete(token);
     }
   };
 }
