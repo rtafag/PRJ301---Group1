@@ -21,7 +21,8 @@ The login screen can reset a password after matching the account's registered em
 
 - Student login, semester/course grade overview, assignment notifications and viewing, source upload, SHA-256 duplicate detection, Java syntax parsing, static rule checks, and personal grades.
 - Teacher course/semester grade overview, per-course grade editing and manual feedback, rule configuration, and assignment management.
-- Optional OpenAI or Gemini feedback, enabled only by setting the provider and its API key in `.env`. When enabled, the submitted source code is sent to that provider for feedback.
+- Optional OpenAI or Gemini feedback, enabled with `AI_PROVIDER=openai` or `AI_PROVIDER=gemini` and the matching API key in `.env`. The feedback prompt treats rule findings as heuristic, requires source-and-line evidence, asks the model to call out possible false positives, and prohibits invented findings or grade changes. Provider setup/response errors appear separately from the local rule results. When enabled, the submitted source code is sent to that provider; do not enable it for private code without authorization.
+- The student Analysis & Fixes view shows the AST summary, parse status, AI explanation, and each rule finding with severity, line number, source evidence, and suggested fix. Rule-based score calculation remains independent of AI feedback.
 - Optional Docker execution sandbox. It is disabled by default; submitted programs are never executed unless explicitly enabled and Docker is available.
 
 ## Teacher course overview
@@ -33,6 +34,18 @@ Manual feedback is stored with the selected course, student, and semester. Teach
 Students see semester and enrolled course selectors in Overview. Unread assignments produce an English notification such as `New assignment in JPE255: Homework`; opening the assignment marks it as read.
 
 The default storage is local JSON under `storage/`; it does not modify the repository CSV data or connect to SQL Server. The JSON REST API and storage adapter can be replaced with a SQL Server repository when DB credentials/schema are ready.
+
+## AI feedback configuration
+
+Copy `.env.example` to `.env`, then configure exactly one provider:
+
+```dotenv
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-key
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Or set `AI_PROVIDER=gemini` with `GEMINI_API_KEY` and optionally `GEMINI_MODEL`. Use `AI_PROVIDER=disabled` to keep analysis local. AI feedback is explanatory only: it does not create findings, change severities, or affect the score. If the selected provider is misconfigured or unavailable, the local analysis is retained and a warning is shown. Provider integration tests use mocked responses; a live request requires a valid key and network access.
 
 ## Sandbox
 

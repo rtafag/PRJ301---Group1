@@ -402,10 +402,33 @@ async function renderStudentView() {
     <div class="analysis-list">${analyses.map((submission) => `
       <section class="analysis-entry">
         <div class="section-heading"><h2>${escapeHtml(submission.fileName)}</h2><span class="pill ${submission.analysis.syntaxValid ? '' : 'warn'}">${submission.analysis.syntaxValid ? 'Syntax valid' : 'Needs review'}</span></div>
-        <p>${escapeHtml(submission.analysis.aiFeedback || 'No feedback available.')}</p>
+        <section class="analysis-feedback">
+          <p class="analysis-label">AI explanation</p>
+          <p class="feedback-copy">${escapeHtml(submission.analysis.aiFeedback || 'No feedback available.')}</p>
+        </section>
+        <section class="ast-summary" aria-label="AST summary">
+          <div><p class="analysis-label">AST summary</p><strong>${escapeHtml(submission.analysis.astJson?.root || 'Unavailable')}</strong></div>
+          <span>${submission.analysis.astJson ? `${Number(submission.analysis.astJson.grammarNodeCount).toLocaleString()} grammar nodes · ${Number(submission.analysis.astJson.productionCount).toLocaleString()} productions` : 'AST could not be generated'}</span>
+          <span>${Number(submission.analysis.executionTimeMs ?? 0).toLocaleString()} ms</span>
+        </section>
         ${submission.manualFeedback ? `<p><strong>Teacher feedback:</strong> ${escapeHtml(submission.manualFeedback)}</p>` : ''}
         ${submission.analysis.providerWarning ? `<p class="login-note">External AI feedback unavailable: ${escapeHtml(submission.analysis.providerWarning)}</p>` : ''}
-        ${submission.analysis.violations?.length ? `<div class="finding-list">${submission.analysis.violations.map((finding) => `<div class="finding"><strong>${escapeHtml(finding.ruleCode || finding.ruleName)}</strong> Line ${escapeHtml(finding.lineNumber)}: ${escapeHtml(finding.suggestedFix)}</div>`).join('')}</div>` : emptyState('No configured rule violations found.')}
+        <div class="finding-section">
+          <div class="section-heading"><h3>Rule findings</h3><span>${submission.analysis.violations?.length ?? 0} found</span></div>
+          ${submission.analysis.violations?.length ? `<div class="finding-list">${submission.analysis.violations.map((finding) => {
+            const severity = String(finding.severity || 'unknown').toLowerCase();
+            const severityClass = ['critical', 'high', 'medium', 'low'].includes(severity) ? severity : 'unknown';
+            return `<article class="finding severity-${severityClass}">
+              <div class="finding-heading">
+                <strong>${escapeHtml(finding.ruleName || finding.ruleCode || 'Rule finding')}</strong>
+                <span class="severity-badge">${escapeHtml(finding.severity || 'Unspecified')}</span>
+              </div>
+              <p class="finding-meta">${escapeHtml(finding.ruleCode || '')}${finding.lineNumber ? ` · Line ${escapeHtml(finding.lineNumber)}` : ''}</p>
+              ${finding.evidence ? `<pre class="finding-evidence"><code>${escapeHtml(finding.evidence)}</code></pre>` : ''}
+              <p class="finding-fix">${escapeHtml(finding.suggestedFix || 'Review this code against the configured rule.')}</p>
+            </article>`;
+          }).join('')}</div>` : emptyState('No configured rule findings. This does not guarantee the code is free of defects.')}
+        </div>
         ${submission.sourceCode ? `<button class="button button-secondary run-sandbox" type="button" data-submission-id="${escapeHtml(submission.submissionId)}">Run in sandbox</button>` : ''}
       </section>`).join('')}</div>`;
 }
