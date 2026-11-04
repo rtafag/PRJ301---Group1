@@ -296,19 +296,42 @@ PRJ301---Group1/
 ├── data/                         # Dữ liệu mẫu khởi tạo CSDL (.csv)
 │   ├── users.csv                 # Dữ liệu tài khoản người dùng
 │   ├── submission.csv            # Dữ liệu bài nộp thử nghiệm
-│   ├── rule_definition.csv       # Danh mục các quy tắc phân tích
+│   ├── rule_definition.csv       # Danh mục 15 quy tắc phân tích AST (TV3)
 │   ├── analysis_result.csv       # Kết quả phân tích mẫu
 │   ├── rule_violation.csv        # Danh sách lỗi vi phạm mẫu
 │   └── score.csv                 # Điểm số mẫu
+├── demo-samples/                 # Tập mã nguồn mẫu phục vụ Demo trực tiếp (TV3)
+│   ├── Sample01_InfiniteLoop_Bad.java    # Demo chuyên sâu vòng lặp vô hạn
+│   ├── Sample02_LogicErrors_Bad.java     # Demo lỗi logic (==, / 0, gán nhầm, catch rỗng)
+│   ├── Sample03_ResourceAndOOP_Bad.java  # Demo rò rỉ JDBC & vi phạm OOP contract
+│   └── Sample04_CleanSubmission_Good.java # Demo mã nguồn chuẩn đạt 10.0/10 (0% FP)
 ├── src/main/java/com/group1/
+│   ├── controller/               # Tầng Controller (AppController, SubmissionController, ...)
 │   ├── dao/                      # Tầng DAO (UsersDAO, SubmissionDAO, ScoreDAO, ...)
-│   ├── model/                    # Tầng Model (6 thực thể chuẩn hóa)
-│   ├── util/                     # Hỗ trợ đọc CSV, băm SHA-256, DBContext
+│   ├── model/                    # Tầng Model (Users, Submission, AnalysisResult, Score, ...)
+│   ├── rule/                     # Module Lõi AST Rule Engine (TV3)
+│   │   ├── ASTRuleEngine.java    # Bộ điều phối phân tích AST JavaParser
+│   │   ├── RuleViolationResult.java
+│   │   ├── RuleEngineBenchmark.java   # Công cụ benchmark & demo trực tiếp CLI
+│   │   ├── IndividualRuleTestSuite.java # Bộ kiểm thử 15/15 rule & False Positive
+│   │   └── visitor/              # 15 Visitor duyệt AST độc lập (TV3)
+│   │       ├── InfiniteLoopVisitor.java
+│   │       ├── StringComparisonVisitor.java
+│   │       ├── DivisionByZeroVisitor.java
+│   │       ├── AssignmentInConditionVisitor.java
+│   │       ├── DeadCodeVisitor.java
+│   │       ├── MissingOverrideVisitor.java
+│   │       ├── EqualsHashCodeVisitor.java
+│   │       ├── DuplicateCodeVisitor.java
+│   │       ├── ResourceLeakVisitor.java
+│   │       └── ... (các visitor khác)
+│   ├── service/                  # Dịch vụ tích hợp AI (TV3)
+│   │   └── AIService.java        # Client OpenAI / Gemini & Local Pedagogical Explainer
+│   ├── util/                     # Hỗ trợ đọc CSV, băm SHA-256, DBConnection, JWT
 │   ├── DataGenerator.java        # Tiện ích sinh dữ liệu mẫu
 │   └── Main.java                 # Chương trình kiểm tra kết nối & nạp DB
-├── generate_models.py            # Script tự động hóa sinh Model & DAO
-├── fix_sql.ps1                   # Script hỗ trợ bật TCP/IP cho SQL Server
-├── pom.xml                       # Quản lý dependencies (mssql-jdbc, ...)
+├── portal-node/                  # Cổng nộp bài Web Portal (Node/Express)
+├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, ...)
 └── README.md                     # Tài liệu kiến trúc dự án & timeline
 ```
 
