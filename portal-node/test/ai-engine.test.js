@@ -6,8 +6,92 @@ import { analyzeJavaSource, sha256 } from '../src/ai-engine.js';
 import { createAuth } from '../src/auth.js';
 import { createStore } from '../src/store.js';
 
+async function withAiConfiguration(configuration, run) {
+  const previousEnvironment = Object.fromEntries(
+    Object.keys(configuration).map((key) => [key, process.env[key]])
+  );
+  const previousFetch = globalThis.fetch;
+  for (const [key, value] of Object.entries(configuration)) process.env[key] = value;
+  try {
+    return await run();
+  } finally {
+    for (const [key, value] of Object.entries(previousEnvironment)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    globalThis.fetch = previousFetch;
+  }
+}
+
 test('SHA-256 is stable for source text', () => {
   assert.equal(sha256('class Demo {}'), '6b0bc56d86c65d0bfcd9345491723d348e6f9e3375cb09be21aafc8c1b3aea08');
+});
+
+test('OpenAI prompt grounds feedback in findings and source evidence', async () => {
+  await withAiConfiguration({
+    AI_PROVIDER: 'openai',
+    OPENAI_API_KEY: 'test-key',
+    OPENAI_MODEL: 'test-model'
+  }, async () => {
+    let requestBody;
+    globalThis.fetch = async (url, options) => {
+      assert.equal(url, 'https://api.openai.com/v1/chat/completions');
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: 'Có một cảnh báo cần kiểm tra.' } }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const source = 'public class Demo {\n  public Object value() { return null; }\n}';
+    const result = await analyzeJavaSource(source, [
+      { ruleCode: 'NPE', ruleName: 'Null return', severity: 'High', penaltyPoints: 2, enabled: true }
+    ]);
+
+    assert.equal(result.aiFeedback, 'Có một cảnh báo cần kiểm tra.');
+    assert.equal(result.providerWarning, null);
+    assert.equal(result.violations[0].lineNumber, 2);
+    assert.equal(result.violations[0].evidence, 'public Object value() { return null; }');
+    assert.equal(requestBody.model, 'test-model');
+    assert.equal(requestBody.temperature, 0.1);
+    assert.match(requestBody.messages[0].content, /heuristic/);
+    assert.match(requestBody.messages[0].content, /false positive/);
+    assert.match(requestBody.messages[0].content, /không.*điểm số/);
+    assert.deepEqual(JSON.parse(requestBody.messages[1].content).findings, result.violations);
+  });
+});
+
+test('Gemini receives the same evidence-based prompt', async () => {
+  await withAiConfiguration({
+    AI_PROVIDER: 'gemini',
+    GEMINI_API_KEY: 'test-key',
+    GEMINI_MODEL: 'test-model'
+  }, async () => {
+    let requestBody;
+    globalThis.fetch = async (url, options) => {
+      assert.match(String(url), /models\/test-model:generateContent/);
+      assert.equal(new URL(url).searchParams.get('key'), 'test-key');
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({
+        candidates: [{ content: { parts: [{ text: 'Không phát hiện lỗi chắc chắn.' }] } }]
+      }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    };
+
+    const result = await analyzeJavaSource('public class Demo {}', []);
+    assert.equal(result.aiFeedback, 'Không phát hiện lỗi chắc chắn.');
+    assert.match(requestBody.systemInstruction.parts[0].text, /bằng tiếng Việt/);
+    assert.equal(JSON.parse(requestBody.contents[0].parts[0].text).source, 'public class Demo {}');
+  });
+});
+
+test('selected AI provider configuration failures are visible in analysis results', async () => {
+  await withAiConfiguration({ AI_PROVIDER: 'openai', OPENAI_API_KEY: '' }, async () => {
+    globalThis.fetch = async () => {
+      throw new Error('fetch should not run without an API key');
+    };
+    const result = await analyzeJavaSource('public class Demo {}', []);
+    assert.equal(result.aiFeedback, 'Static analysis found no configured rule violations.');
+    assert.match(result.providerWarning, /OPENAI_API_KEY is not configured/);
+  });
 });
 
 test('Java syntax is parsed and AST summary is returned', async () => {
@@ -27,6 +111,7 @@ test('rule engine reports configured findings and deducts points', async () => {
   assert.equal(result.syntaxValid, true);
   assert.equal(result.violations.length, 1);
   assert.equal(result.violations[0].lineNumber, 2);
+  assert.equal(result.violations[0].evidence, 'public Object value() { return null; }');
   assert.equal(result.totalScore, 8);
 });
 

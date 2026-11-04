@@ -27,7 +27,8 @@ The login screen can reset a password after matching the account's registered em
 
 - Student login, semester/course grade overview, persistent deadline/assignment/grade/feedback notifications, profile and password settings, source upload, SHA-256 duplicate detection, Java syntax parsing, static rule checks, and personal grades.
 - Teacher course/semester grade overview, editable class enrollments and teacher assignments, per-course grade editing and manual feedback, rule configuration, assignment management, submission review, plagiarism signals, grade audit history, reports, and CSV/XLSX export.
-- Optional OpenAI or Gemini feedback, enabled only by setting the provider and its API key in `.env`. When enabled, the submitted source code is sent to that provider for feedback.
+- Optional OpenAI or Gemini feedback, enabled with `AI_PROVIDER=openai` or `AI_PROVIDER=gemini` and the matching API key in `.env`. The feedback prompt treats rule findings as heuristic, requires source-and-line evidence, asks the model to call out possible false positives, and prohibits invented findings or grade changes. Provider setup/response errors appear separately from the local rule results. When enabled, the submitted source code is sent to that provider; do not enable it for private code without authorization.
+- The student Analysis & Fixes view shows the AST summary, parse status, AI explanation, and each rule finding with severity, line number, source evidence, and suggested fix. Rule-based score calculation remains independent of AI feedback.
 - Optional Docker execution sandbox. It is disabled by default; submitted programs are never executed unless explicitly enabled and Docker is available.
 
 ## Teacher course overview
@@ -41,6 +42,10 @@ Students see semester and enrolled course selectors in Overview. The notificatio
 The static analyzer supports the seeded `NPE`, `OOM`, `CS`, `COMMENT`, `LONG_METHOD`, and `DUPLICATE_CODE` rules. A long method is currently defined as over 40 source lines; duplicate code compares normalized method bodies. Teacher Reports exports the scoped grade list as CSV or XLSX. Code-similarity scores compare token shingles within an assignment and are only review signals, not proof of misconduct.
 
 The default storage is local JSON under `storage/`; it does not modify the repository CSV data or connect to SQL Server unless `PORTAL_STORAGE=sqlserver` is configured.
+
+## AI feedback configuration
+
+Set `AI_PROVIDER=openai` with `OPENAI_API_KEY`, or `AI_PROVIDER=gemini` with `GEMINI_API_KEY`, in `.env`. Set `AI_PROVIDER=disabled` to keep analysis local. AI feedback is explanatory only: it does not create findings, change severities, or affect the score. If the selected provider is misconfigured or unavailable, local findings are retained and a warning is shown. Provider integration tests use mocked responses; a live request requires a valid key and network access.
 
 ## Save portal changes to SQL Server
 
@@ -91,6 +96,18 @@ WITH (
 ```
 
 `PortalRuntimeState` stores one JSON snapshot so the portal can persist all existing workflows without changing their API. CSV files remain the source for seed users and rosters; enrollment overrides, grades, assignments, submissions, feedback, and other portal changes are in the SQL snapshot. To switch back to JSON storage, set `PORTAL_STORAGE=json`.
+
+## AI feedback configuration
+
+Copy `.env.example` to `.env`, then configure exactly one provider:
+
+```dotenv
+AI_PROVIDER=openai
+OPENAI_API_KEY=your-key
+OPENAI_MODEL=gpt-4o-mini
+```
+
+Or set `AI_PROVIDER=gemini` with `GEMINI_API_KEY` and optionally `GEMINI_MODEL`. Use `AI_PROVIDER=disabled` to keep analysis local. AI feedback is explanatory only: it does not create findings, change severities, or affect the score. If the selected provider is misconfigured or unavailable, the local analysis is retained and a warning is shown. Provider integration tests use mocked responses; a live request requires a valid key and network access.
 
 ## Sandbox
 
