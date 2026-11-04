@@ -563,6 +563,13 @@ export function createStore({ runtimeData: initialRuntimeData, saveRuntimeData }
     findSubmissionByHash(fileHash) {
       return submissions.find((submission) => submission.fileHash === fileHash) ?? null;
     },
+    findAssignment(assignmentId) {
+      return assignments.find((assignment) => assignment.assignmentId === assignmentId) ?? null;
+    },
+    listQueueFailedSubmissions() {
+      return submissions.filter((submission) => submission.status === 'Queue Failed'
+        && typeof submission.sourceCode === 'string');
+    },
     createSubmission(submission) {
       submissions = [{
         ...submission,
@@ -590,6 +597,13 @@ export function createStore({ runtimeData: initialRuntimeData, saveRuntimeData }
       } else if (!student.courseCodes.some((courseCode) => teacherCourses.includes(courseCode))) {
         return null;
       }
+      return submission;
+    },
+    updateSubmissionStatus(submissionId, status) {
+      const submission = this.findSubmission(submissionId);
+      if (!submission) return null;
+      submission.status = status;
+      persist();
       return submission;
     },
     findSimilarSubmissions(userId, assignmentId, minimumSimilarity = 0.35) {

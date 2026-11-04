@@ -2,6 +2,12 @@
 
 This Node.js MVP provides a REST API and a browser UI for Student and Teacher workflows. It reads demo users and rules from the repository CSV files and stores new submissions in a private local JSON store.
 
+## Redis analysis queue
+
+Java submissions are persisted with `Queued` status and analyzed asynchronously by a Redis-backed priority queue. Assignments due within 24 hours receive priority 1, assignments due within 7 days receive priority 5, and other submissions receive priority 10 (lower numbers run first). Failed analysis is retried up to three attempts with exponential backoff, capped at 30 seconds. Exhausted jobs are marked `Analysis Failed`.
+
+Install and start Redis before starting the portal, then set `REDIS_URL` in `.env` (for example, `redis://127.0.0.1:6379`). The queue uses Redis directly and adds no npm dependencies. If Redis is unavailable, the upload is retained with `Queue Failed` status and the API returns an error rather than silently analyzing inline.
+
 ## Run
 
 ```powershell

@@ -61,6 +61,7 @@ public class LoginController extends HttpServlet {
             if (user != null) {
                 HttpSession session = request.getSession(true);
                 session.setAttribute("currentUser", user);
+                session.setAttribute("userId", user.getUserId());
                 response.sendRedirect(request.getContextPath() + "/home");
             } else {
                 request.setAttribute("errorMessage", "Sai tên đăng nhập hoặc mật khẩu.");

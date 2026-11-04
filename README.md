@@ -339,5 +339,14 @@ PRJ301---Group1/
      ```
 5. **Kiểm tra kết quả:** Màn hình console sẽ thông báo `Connected to SQL Server!` thành công và hiển thị các bản ghi điểm số mẫu từ bảng `Score`.
 
+### 8.4. Kiểm thử tự động
+Chạy toàn bộ unit test và kiểm thử tích hợp HTTP cho luồng Servlet nộp ZIP:
+
+```powershell
+mvn --batch-mode test
+```
+
+`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart tới `SubmissionController`, kiểm tra yêu cầu session, SHA-256, lưu bài và chặn bài trùng. SHA-256 được tính trực tiếp trong servlet, chưa chạy qua Filter. Kiểm thử dùng JDBC test double nên không cần SQL Server.
+
 ---
 *Bản quyền tài liệu thuộc về **Nhóm 1 – PRJ301 (AITA Project)** | Lưu trữ tại GitHub: [rtafag/PRJ301---Group1](https://github.com/rtafag/PRJ301---Group1). Được cập nhật và hoàn thiện theo Đề cương chi tiết 10 tuần và Rubric Đánh giá Học thuật.*
