@@ -17,4 +17,23 @@ public class UsersDAO {
             ps.executeUpdate();
         } catch(Exception e){ e.printStackTrace(); }
     }
+
+    public Users findByUsername(String username) throws SQLException {
+        String sql = "SELECT user_id, username, password_hash, full_name, email, role, created_at "
+                + "FROM Users WHERE username = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, username);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) return null;
+                return new Users(
+                        rs.getString("user_id"),
+                        rs.getString("username"),
+                        rs.getString("password_hash"),
+                        rs.getString("full_name"),
+                        rs.getString("email"),
+                        rs.getString("role"),
+                        rs.getString("created_at"));
+            }
+        }
+    }
 }

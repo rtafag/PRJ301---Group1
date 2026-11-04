@@ -301,11 +301,16 @@ PRJ301---Group1/
 │   ├── rule_violation.csv        # Danh sách lỗi vi phạm mẫu
 │   └── score.csv                 # Điểm số mẫu
 ├── src/main/java/com/group1/
+│   ├── controller/               # Servlet Controller theo MVC2
+│   ├── filter/                   # Filter xác thực và bảo vệ luồng nộp bài
 │   ├── dao/                      # Tầng DAO (UsersDAO, SubmissionDAO, ScoreDAO, ...)
 │   ├── model/                    # Tầng Model (6 thực thể chuẩn hóa)
-│   ├── util/                     # Hỗ trợ đọc CSV, băm SHA-256, DBContext
+│   ├── util/                     # Hỗ trợ JDBC và bảo mật web
 │   ├── DataGenerator.java        # Tiện ích sinh dữ liệu mẫu
 │   └── Main.java                 # Chương trình kiểm tra kết nối & nạp DB
+├── src/main/webapp/
+│   ├── WEB-INF/views/            # JSP dùng EL/JSTL, không truy cập trực tiếp
+│   └── assets/                   # CSS giao diện
 ├── generate_models.py            # Script tự động hóa sinh Model & DAO
 ├── fix_sql.ps1                   # Script hỗ trợ bật TCP/IP cho SQL Server
 ├── pom.xml                       # Quản lý dependencies (mssql-jdbc, ...)
@@ -319,25 +324,15 @@ PRJ301---Group1/
    cd PRJ301---Group1
    ```
 2. **Kiểm tra dịch vụ SQL Server:** Đảm bảo SQL Server đang chạy và cổng `1433` (TCP/IP) đã được kích hoạt (có thể chạy file [fix_sql.ps1](file:///c:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1/fix_sql.ps1) bằng quyền Administrator nếu gặp sự cố cổng TCP).
-3. **Cấu hình chuỗi kết nối:** Mở tệp [Main.java](file:///c:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1/src/main/java/com/group1/Main.java) và cập nhật tài khoản kết nối CSDL (mặc định: `sa` / mật khẩu quản trị).
-4. **Biên dịch và chạy thử:**
-   - **Cách 1: Sử dụng Java trực tiếp (đã có sẵn `mssql-jdbc.jar` trong repo):**
-     ```powershell
-     # Tạo thư mục output nếu chưa có
-     New-Item -ItemType Directory -Force -Path target/classes
-     
-     # Biên dịch mã nguồn với mã hóa UTF-8
-     javac -encoding UTF-8 -cp ".;mssql-jdbc.jar" -d target/classes (Get-ChildItem -Recurse src/main/java/*.java | ForEach-Object { $_.FullName })
-     
-     # Thực thi chương trình
-     java -cp "target/classes;mssql-jdbc.jar" com.group1.Main
-     ```
-   - **Cách 2: Sử dụng Apache Maven (nếu môi trường đã cài `mvn`):**
-     ```powershell
-     mvn clean compile
-     mvn exec:java -Dexec.mainClass="com.group1.Main"
-     ```
-5. **Kiểm tra kết quả:** Màn hình console sẽ thông báo `Connected to SQL Server!` thành công và hiển thị các bản ghi điểm số mẫu từ bảng `Score`.
+3. **Cấu hình kết nối SQL Server** qua biến môi trường `DB_URL`, `DB_USER`, `DB_PASSWORD`; bảo đảm database có các tài khoản sinh viên từ `data/users.csv` trong bảng `Users`. Bảng `Submission` sẽ được tạo tự động nếu chưa có.
+4. Tài khoản mẫu trong `data/users.csv` dùng mật khẩu demo `hash_<username>`; đây chỉ là thông tin kiểm thử, không dùng trong triển khai thật. Mật khẩu dạng SHA-256 có thể lưu theo định dạng `sha256:<hex>`.
+5. **Đóng gói và chạy Submission Portal:** yêu cầu Java 8+, Maven và Tomcat 9 (Servlet 4 / `javax.servlet`).
+   ```powershell
+   mvn clean package
+   Copy-Item target\PRJ301_AITA_DB-1.0-SNAPSHOT.war <TOMCAT_HOME>\webapps\aita.war
+   ```
+   Khởi động Tomcat rồi mở `http://localhost:8080/aita/login`. Mặc định tệp bài nộp được lưu ngoài web root tại `<CATALINA_BASE>\submission-storage` (hoặc `<user-home>\.aita\submission-storage` nếu không chạy trong Tomcat); có thể đổi bằng `SUBMISSION_STORAGE_DIR`.
+6. **Luồng bảo mật:** `/submissions` chỉ cho phiên Student đã đăng nhập; POST phải là multipart, có CSRF token hợp lệ và giới hạn 10 MB. Controller chỉ hiển thị/nạp bài của người dùng đang đăng nhập, đặt tên tệp bằng UUID, tính SHA-256 và lưu metadata qua DAO/JDBC.
 
 ---
 *Bản quyền tài liệu thuộc về **Nhóm 1 – PRJ301 (AITA Project)** | Lưu trữ tại GitHub: [rtafag/PRJ301---Group1](https://github.com/rtafag/PRJ301---Group1). Được cập nhật và hoàn thiện theo Đề cương chi tiết 10 tuần và Rubric Đánh giá Học thuật.*
