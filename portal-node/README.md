@@ -19,6 +19,15 @@ npm.cmd start
 
 Open `http://localhost:3000`. User IDs run from `GV0001` for teachers and `HE001` for students. Usernames use each roster email's local part, and demo passwords use `hash_<username>`; duplicate email local parts include the lower-case user ID as a suffix. These are sample credentials, not production password hashes.
 
+## Student and teacher UI demo
+
+The sign-in screen has one-click shortcuts for the seeded student `HE001` and teacher `GV0001`. After sign-in, the Overview dashboard shows a role-specific three-step guide:
+
+1. **Student:** Submit Source Code → Analysis & Fixes → My Grades. Upload a Java file from `../demo-samples/`; the same file cannot be submitted twice.
+2. **Teacher:** Submissions → Rule Engine → Manual Feedback. Open a submission to review its analysis and leave course feedback.
+
+For a live upload-and-analysis demo, start Redis and configure `REDIS_URL` before starting the portal. The quick sign-in shortcuts use the repository's sample credentials and are for local/classroom demonstrations only; remove or disable them before exposing the demo deployment to untrusted users.
+
 ## Password recovery
 
 The login screen can reset a password after matching the account's registered email and User ID. The new password must contain at least 8 characters and is stored as a scrypt hash in the local runtime data. This demo validates the email but does not send email; production recovery should use a short-lived, single-use token delivered to the account email instead of relying on a User ID.

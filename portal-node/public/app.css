@@ -59,6 +59,15 @@ input:focus, textarea:focus, select:focus { border-color: var(--forest); box-sha
 .form-error { min-height: 18px; margin: 8px 0 0; color: #aa382d; font-size: 12px; }
 .text-button { display: block; margin: 13px 0 0 auto; border: 0; padding: 0; background: transparent; color: var(--forest); font-size: 12px; font-weight: 600; }
 .text-button:hover { text-decoration: underline; }
+.demo-access { display: grid; gap: 8px; margin-top: 21px; padding-top: 17px; border-top: 1px solid var(--line); }
+.demo-access-title { margin: 0; color: var(--muted); font: 9px "DM Mono", Consolas, monospace; letter-spacing: .1em; }
+.demo-role-button { display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--line); padding: 10px 12px; background: #f8faf7; color: var(--ink); text-align: left; }
+.demo-role-button:hover, .demo-role-button:focus-visible { border-color: var(--forest); background: var(--soft-green); }
+.demo-role-button strong, .demo-role-button small { display: block; }
+.demo-role-button strong { font-size: 12px; }
+.demo-role-button small { margin-top: 3px; color: var(--muted); font-size: 10px; }
+.demo-role-button > span:last-child { color: var(--forest); font-size: 16px; }
+.demo-role-button:disabled, .button:disabled { cursor: wait; opacity: .7; }
 
 .portal-screen { min-height: calc(100vh - 74px); display: grid; grid-template-columns: 230px minmax(0, 1fr); }
 .sidebar { display: flex; flex-direction: column; padding: 26px 15px 18px; background: var(--forest-dark); color: white; }
@@ -84,6 +93,16 @@ input:focus, textarea:focus, select:focus { border-color: var(--forest); box-sha
 .section-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin: 28px 0 13px; }
 .section-heading h2 { margin: 0; font-size: 17px; }
 .section-heading p { margin: 0; color: var(--muted); font-size: 12px; }
+.demo-guide { margin: 0 0 24px; padding: 19px; border: 1px solid #cbd9ce; background: linear-gradient(110deg, #edf4ec, #fff 75%); }
+.demo-guide-heading { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.demo-guide-heading .eyebrow { margin-bottom: 5px; }
+.demo-guide-heading h2 { margin: 0; font-size: 18px; }
+.demo-guide-role { padding: 5px 8px; border: 1px solid var(--line); background: white; color: var(--muted); font: 9px "DM Mono", Consolas, monospace; letter-spacing: .08em; }
+.demo-guide-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin-top: 16px; }
+.demo-step { display: flex; align-items: center; gap: 9px; min-height: 46px; border: 1px solid var(--line); padding: 9px 10px; background: white; color: var(--ink); text-align: left; font-size: 11px; font-weight: 600; }
+.demo-step:hover, .demo-step:focus-visible { border-color: var(--forest); color: var(--forest); }
+.demo-step-number { color: #78877d; font: 9px "DM Mono", Consolas, monospace; }
+.demo-step > span:last-child { margin-left: auto; font-size: 14px; }
 .table-wrap { overflow-x: auto; border: 1px solid var(--line); background: var(--surface); }
 table { width: 100%; border-collapse: collapse; min-width: 650px; }
 th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; font-size: 12px; }
@@ -256,6 +275,7 @@ textarea { min-height: 110px; resize: vertical; }
   .metric { min-height: 96px; padding: 12px; }
   .metric strong { font-size: 23px; }
   .field-row { grid-template-columns: 1fr; }
+  .demo-guide-steps { grid-template-columns: 1fr; }
   .teacher-review-grid, .report-grid { grid-template-columns: 1fr; }
   .rule-row { grid-template-columns: 1fr 100px; gap: 10px; }
   .rule-row .rule-enabled { grid-column: 1 / -1; }
