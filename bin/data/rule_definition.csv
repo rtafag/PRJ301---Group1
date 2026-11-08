@@ -1,0 +1,4 @@
+ruleId,ruleCode,ruleName,severity,penaltyPoints,description
+1,NPE,NullPointerException,High,2.0,Avoid returning null without check
+2,OOM,OutOfMemoryError,Critical,5.0,Memory leak detected in loop
+3,CS,CodeStyle,Low,0.5,Variable naming convention violation
