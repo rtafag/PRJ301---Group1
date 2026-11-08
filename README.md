@@ -369,7 +369,15 @@ Chạy toàn bộ unit test và kiểm thử tích hợp HTTP cho luồng Servle
 mvn --batch-mode test
 ```
 
-`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart tới `SubmissionController`, kiểm tra yêu cầu session, SHA-256, lưu bài và chặn bài trùng. SHA-256 được tính trực tiếp trong servlet, chưa chạy qua Filter. Kiểm thử dùng JDBC test double nên không cần SQL Server.
+`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart qua `SubmissionSecurityFilter` tới `SubmissionController`, kiểm tra request chưa đăng nhập và tài khoản không phải sinh viên bị chặn trước khi servlet xử lý, đồng thời xác nhận SHA-256, lưu bài và chặn bài trùng. Filter kiểm tra session và vai trò; servlet tiếp tục kiểm tra lại quyền, xác thực ZIP và lưu dữ liệu.
+
+Submission Portal dùng `GET /student/submissions` để hiển thị JSP lịch sử bài nộp theo người dùng và `POST /student/submissions` để gửi ZIP. Từ lịch sử, sinh viên mở `GET /student/analysis?submissionId=...` để xem AST JSON, nhận xét AI, từng lỗi, mức độ nghiêm trọng, vị trí và gợi ý sửa. Dashboard chỉ đọc bài nộp thuộc phiên đăng nhập; truy cập bài người khác trả về 404, bài chưa có phân tích hiển thị trạng thái chờ. Các view nằm dưới `WEB-INF/views`, sử dụng JSTL/EL và không thể truy cập trực tiếp qua URL. JSTL được khai báo trong `pom.xml`.
+
+Kiểm thử HTTP bao phủ luồng upload, vai trò sinh viên/giảng viên, hiển thị kết quả cho chủ bài nộp, từ chối bài của tài khoản khác và trạng thái chưa có kết quả.
+
+### Luồng demo UI TV4
+
+Home điều hướng theo vai trò: sinh viên vào trang nộp/lịch sử; giảng viên vào danh sách bài nộp và xem kết quả toàn lớp. Kịch bản từng bước, dữ liệu cần chuẩn bị và các điểm demo bảo mật nằm trong [docs/DEMO_UI_TV4.md](./docs/DEMO_UI_TV4.md).
 
 ---
 *Bản quyền tài liệu thuộc về **Nhóm 1 – PRJ301 (AITA Project)** | Lưu trữ tại GitHub: [rtafag/PRJ301---Group1](https://github.com/rtafag/PRJ301---Group1). Được cập nhật và hoàn thiện theo Đề cương chi tiết 10 tuần và Rubric Đánh giá Học thuật.*
