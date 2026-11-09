@@ -2,6 +2,7 @@ package com.group1.util;
 
 import com.group1.model.*;
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -11,7 +12,17 @@ import java.util.List;
 public class CSVHelper {
 
     private static BufferedReader openReader(String path) throws Exception {
-        return new BufferedReader(new InputStreamReader(new FileInputStream(path), StandardCharsets.UTF_8));
+        File f = new File(path);
+        if (!f.exists()) {
+            f = new File("PRJ301---Group1", path);
+        }
+        if (!f.exists()) {
+            f = new File("C:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1", path);
+        }
+        if (!f.exists()) {
+            f = new File(System.getProperty("user.dir"), path);
+        }
+        return new BufferedReader(new InputStreamReader(new FileInputStream(f), StandardCharsets.UTF_8));
     }
 
     public static List<Users> readUsers(String path) {

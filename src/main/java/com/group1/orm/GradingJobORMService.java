@@ -5,16 +5,20 @@ import com.group1.model.RuleViolation;
 import com.group1.model.Score;
 import com.group1.model.Submission;
 import com.group1.util.DBConnection;
+import com.group1.util.JpaUtil;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import javax.persistence.EntityManager;
+import javax.persistence.EntityTransaction;
 
 /**
- * JPA/ORM-oriented Service for managing the automated Grading Job Queue.
- * Ensures strict transactional consistency and synchronization across
+ * Enterprise JPA/ORM-oriented Service for managing the automated Grading Job Queue.
+ * Supports both standard JPA EntityManager transactions (Hibernate) and ACID JDBC transactions,
+ * ensuring strict transactional consistency and synchronization across
  * Submission, AnalysisResult, Score, and RuleViolation tables.
  */
 public class GradingJobORMService {
@@ -43,7 +47,77 @@ public class GradingJobORMService {
     }
 
     /**
-     * Atomically executes and commits a complete Grading Job unit of work.
+     * Atomically executes and commits a complete Grading Job unit of work using standard JPA / Hibernate ORM.
+     * Synchronizes Submission status, persists AnalysisResult, Score, and RuleViolations in a single JPA transaction.
+     */
+    public boolean processGradingJobViaJPA(Submission submission, Score score, AnalysisResult analysis, List<RuleViolation> violations) {
+        EntityManager em = JpaUtil.getEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+
+            // 1. Synchronize Submission status
+            submission.setStatus("Graded");
+            em.merge(submission);
+
+            // 2. Persist or Merge Score
+            Score existingScore = null;
+            try {
+                existingScore = em.createQuery("SELECT s FROM Score s WHERE s.submissionId = :subId", Score.class)
+                        .setParameter("subId", submission.getSubmissionId())
+                        .getSingleResult();
+            } catch (Exception ignored) {
+            }
+
+            if (existingScore != null) {
+                existingScore.setTotalScore(score.getTotalScore());
+                existingScore.setDeduction(score.getDeduction());
+                existingScore.setGradingNotes(score.getGradingNotes());
+                existingScore.setUpdatedAt(score.getUpdatedAt());
+                em.merge(existingScore);
+            } else {
+                em.persist(score);
+            }
+
+            // 3. Persist or Merge AnalysisResult
+            AnalysisResult existingAnal = null;
+            try {
+                existingAnal = em.createQuery("SELECT a FROM AnalysisResult a WHERE a.submissionId = :subId", AnalysisResult.class)
+                        .setParameter("subId", submission.getSubmissionId())
+                        .getSingleResult();
+            } catch (Exception ignored) {
+            }
+
+            if (existingAnal != null) {
+                existingAnal.setAstJson(analysis.getAstJson());
+                existingAnal.setAiFeedback(analysis.getAiFeedback());
+                existingAnal.setExecutionTimeMs(analysis.getExecutionTimeMs());
+                em.merge(existingAnal);
+            } else {
+                em.persist(analysis);
+            }
+
+            // 4. Persist RuleViolations
+            if (violations != null) {
+                for (RuleViolation v : violations) {
+                    em.merge(v);
+                }
+            }
+
+            tx.commit();
+            return true;
+        } catch (Exception e) {
+            if (tx.isActive()) {
+                tx.rollback();
+            }
+            throw new RuntimeException("JPA/Hibernate GradingJob transaction failed: " + e.getMessage(), e);
+        } finally {
+            em.close();
+        }
+    }
+
+    /**
+     * Atomically executes and commits a complete Grading Job unit of work via JDBC transaction.
      * Synchronizes Submission status, persists AnalysisResult, Score, and RuleViolations in a single ACID transaction.
      */
     public boolean processGradingJob(Submission submission, Score score, AnalysisResult analysis, List<RuleViolation> violations) throws SQLException {
@@ -69,16 +143,16 @@ public class GradingJobORMService {
                     ps.executeUpdate();
                 }
 
-                // 2. Persist / Synchronize Score
+                // 2. Persist / Update Score
                 try (PreparedStatement ps = conn.prepareStatement(insertScoreSql)) {
-                    ps.setString(1, score.getSubmissionId());
+                    ps.setString(1, submission.getSubmissionId());
                     ps.setFloat(2, score.getTotalScore());
                     ps.setFloat(3, score.getDeduction());
                     ps.setString(4, score.getGradingNotes());
                     ps.setString(5, score.getUpdatedAt());
-                    ps.setString(6, score.getSubmissionId());
+                    ps.setString(6, submission.getSubmissionId());
                     ps.setInt(7, score.getScoreId());
-                    ps.setString(8, score.getSubmissionId());
+                    ps.setString(8, submission.getSubmissionId());
                     ps.setFloat(9, score.getTotalScore());
                     ps.setFloat(10, score.getDeduction());
                     ps.setString(11, score.getGradingNotes());
@@ -86,15 +160,15 @@ public class GradingJobORMService {
                     ps.executeUpdate();
                 }
 
-                // 3. Persist / Synchronize AnalysisResult
+                // 3. Persist / Update AnalysisResult
                 try (PreparedStatement ps = conn.prepareStatement(insertAnalSql)) {
-                    ps.setString(1, analysis.getSubmissionId());
+                    ps.setString(1, submission.getSubmissionId());
                     ps.setString(2, analysis.getAstJson());
                     ps.setString(3, analysis.getAiFeedback());
                     ps.setInt(4, analysis.getExecutionTimeMs());
-                    ps.setString(5, analysis.getSubmissionId());
+                    ps.setString(5, submission.getSubmissionId());
                     ps.setInt(6, analysis.getAnalysisId());
-                    ps.setString(7, analysis.getSubmissionId());
+                    ps.setString(7, submission.getSubmissionId());
                     ps.setString(8, analysis.getAstJson());
                     ps.setString(9, analysis.getAiFeedback());
                     ps.setInt(10, analysis.getExecutionTimeMs());
