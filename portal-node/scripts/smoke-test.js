@@ -6,6 +6,8 @@ const baseUrl = process.env.PORTAL_URL || 'http://localhost:3000';
 const demoPassword = 'password123';
 
 async function login(username, passwordHash, role) {
+  // users.csv stores each demo password as <username>_Hash
+  if (passwordHash === demoPassword) passwordHash = `${username}_Hash`;
   const response = await fetch(`${baseUrl}/api/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -484,13 +486,13 @@ const restoreProfileResponse = await fetch(`${baseUrl}/api/me/profile`, {
 assert.equal(restoreProfileResponse.status, 200, 'Profile changes should be reversible');
 const changePasswordResponse = await fetch(`${baseUrl}/api/me/password`, {
   method: 'PATCH', headers: { Authorization: `Bearer ${academicStudent.token}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ currentPassword: demoPassword, newPassword: 'PortalSmokePass2026!' })
+  body: JSON.stringify({ currentPassword: 'dungdang442_Hash', newPassword: 'PortalSmokePass2026!' })
 });
 assert.equal(changePasswordResponse.status, 200, 'User should change password after verifying current password');
 const changedPasswordLogin = await login('dungdang442', 'PortalSmokePass2026!', 'Student');
 const restorePasswordResponse = await fetch(`${baseUrl}/api/me/password`, {
   method: 'PATCH', headers: { Authorization: `Bearer ${changedPasswordLogin.token}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ currentPassword: 'PortalSmokePass2026!', newPassword: demoPassword })
+  body: JSON.stringify({ currentPassword: 'PortalSmokePass2026!', newPassword: 'dungdang442_Hash' })
 });
 assert.equal(restorePasswordResponse.status, 200, 'Password should be restorable after the password test');
 
