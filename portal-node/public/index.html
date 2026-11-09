@@ -41,8 +41,19 @@
           <input id="password-hash" name="passwordHash" type="password" autocomplete="current-password" required>
           <p id="login-error" class="form-error" role="alert"></p>
           <button class="button button-primary button-wide" type="submit">Sign in <span aria-hidden="true">&#8594;</span></button>
+          <div class="demo-access" aria-label="Quick demo sign in">
+            <p class="demo-access-title">QUICK DEMO</p>
+            <button class="demo-role-button" type="button" data-demo-login="student">
+              <span><strong>Student · HE001</strong><small>Submit → analysis → grades</small></span>
+              <span aria-hidden="true">&#8594;</span>
+            </button>
+            <button class="demo-role-button" type="button" data-demo-login="teacher">
+              <span><strong>Teacher · GV0001</strong><small>Review submissions → feedback</small></span>
+              <span aria-hidden="true">&#8594;</span>
+            </button>
+          </div>
           <button id="show-password-reset" class="text-button" type="button">Forgot password?</button>
-          <p class="login-note">Use the demo credentials provided in the project user data.</p>
+          <p class="login-note">Quick demo uses seeded sample accounts. Use the fields above for other accounts.</p>
         </form>
 
         <form id="password-reset-form" class="login-form" autocomplete="on" hidden>

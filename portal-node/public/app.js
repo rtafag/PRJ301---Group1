@@ -31,6 +31,11 @@ const portalScreen = document.querySelector('#portal-screen');
 const workspace = document.querySelector('#workspace-content');
 const toast = document.querySelector('#toast');
 
+const demoAccounts = {
+  student: { username: 'dungdang442', passwordHash: 'hash_dungdang442' },
+  teacher: { username: 'sondang619', passwordHash: 'hash_sondang619' }
+};
+
 const studentNavigation = [
   ['dashboard', 'Overview'],
   ['submit', 'Submit Source Code'],
@@ -126,6 +131,29 @@ function metric(label, value) {
 
 function emptyState(message) {
   return `<div class="empty-state">${escapeHtml(message)}</div>`;
+}
+
+function renderDemoGuide(role) {
+  const isStudent = role.toLowerCase() === 'student';
+  const steps = isStudent
+    ? [
+      ['submit', '01', 'Submit a Java file'],
+      ['analysis', '02', 'Review AST & fixes'],
+      ['grades', '03', 'Check the score']
+    ]
+    : [
+      ['submissions', '01', 'Review submissions'],
+      ['rules', '02', 'Explain rule findings'],
+      ['feedback', '03', 'Add instructor feedback']
+    ];
+  return `<section class="demo-guide" aria-label="Suggested demo flow">
+    <div class="demo-guide-heading"><div><p class="eyebrow">SUGGESTED DEMO FLOW</p><h2>${isStudent ? 'From upload to feedback' : 'From review to guidance'}</h2></div>
+      <span class="demo-guide-role">${isStudent ? 'STUDENT' : 'TEACHER'}</span></div>
+    <div class="demo-guide-steps">${steps.map(([view, number, label]) => `
+      <button class="demo-step" type="button" data-view="${view}">
+        <span class="demo-step-number">${number}</span><span>${label}</span><span aria-hidden="true">&#8594;</span>
+      </button>`).join('')}</div>
+  </section>`;
 }
 
 function renderAccountSettings(profile) {
@@ -490,13 +518,19 @@ function renderStudentAssignments(assignments) {
 
 async function renderStudentView() {
   if (state.view === 'dashboard') {
-    const [coursePayload, gradePayload, assignmentPayload, notificationPayload] = await Promise.all([
-      api('/api/student/courses'), api('/api/student/course-grades'), api('/api/student/assignments'), api('/api/me/notifications')
+    const [coursePayload, gradePayload, assignmentPayload, notificationResult] = await Promise.all([
+      api('/api/student/courses'),
+      api('/api/student/course-grades'),
+      api('/api/student/assignments'),
+      api('/api/me/notifications').then(
+        (payload) => ({ payload }),
+        (error) => ({ error })
+      )
     ]);
     state.courses = coursePayload.courses;
     state.semesters = coursePayload.semesters;
     state.studentAssignments = assignmentPayload.assignments;
-    state.notifications = notificationPayload.notifications;
+    state.notifications = notificationResult.payload?.notifications ?? [];
     if (!state.semesters.some((semester) => semester.value === state.selectedSemester)) {
       state.selectedSemester = state.semesters[0]?.value ?? '';
     }
@@ -505,7 +539,10 @@ async function renderStudentView() {
     }
     const selectedCourse = state.courses.find((course) => course.courseCode === state.selectedCourseCode);
     const notifications = renderStudentNotifications(state.studentAssignments, state.notifications);
-    return `${notifications}${selectedCourse
+    const notificationWarning = notificationResult.error
+      ? `<div class="notice" role="status">Notifications could not be loaded: ${escapeHtml(notificationResult.error.message)}</div>`
+      : notifications;
+    return `${renderDemoGuide('student')}${notificationWarning}${selectedCourse
       ? renderStudentCourseGrades(selectedCourse, gradePayload.courseGrades)
       : renderStudentCoursePicker()}`;
   }
@@ -560,10 +597,33 @@ async function renderStudentView() {
     <div class="analysis-list">${analyses.map((submission) => `
       <section class="analysis-entry">
         <div class="section-heading"><h2>${escapeHtml(submission.fileName)}</h2><span class="pill ${submission.analysis.syntaxValid ? '' : 'warn'}">${submission.analysis.syntaxValid ? 'Syntax valid' : 'Needs review'}</span></div>
-        <p>${escapeHtml(submission.analysis.aiFeedback || 'No feedback available.')}</p>
+        <section class="analysis-feedback">
+          <p class="analysis-label">AI explanation</p>
+          <p class="feedback-copy">${escapeHtml(submission.analysis.aiFeedback || 'No feedback available.')}</p>
+        </section>
+        <section class="ast-summary" aria-label="AST summary">
+          <div><p class="analysis-label">AST summary</p><strong>${escapeHtml(submission.analysis.astJson?.root || 'Unavailable')}</strong></div>
+          <span>${submission.analysis.astJson ? `${Number(submission.analysis.astJson.grammarNodeCount).toLocaleString()} grammar nodes · ${Number(submission.analysis.astJson.productionCount).toLocaleString()} productions` : 'AST could not be generated'}</span>
+          <span>${Number(submission.analysis.executionTimeMs ?? 0).toLocaleString()} ms</span>
+        </section>
         ${submission.manualFeedback ? `<p><strong>Teacher feedback:</strong> ${escapeHtml(submission.manualFeedback)}</p>` : ''}
         ${submission.analysis.providerWarning ? `<p class="login-note">External AI feedback unavailable: ${escapeHtml(submission.analysis.providerWarning)}</p>` : ''}
-        ${submission.analysis.violations?.length ? `<div class="finding-list">${submission.analysis.violations.map((finding) => `<div class="finding"><strong>${escapeHtml(finding.ruleCode || finding.ruleName)}</strong> Line ${escapeHtml(finding.lineNumber)}: ${escapeHtml(finding.suggestedFix)}</div>`).join('')}</div>` : emptyState('No configured rule violations found.')}
+        <div class="finding-section">
+          <div class="section-heading"><h3>Rule findings</h3><span>${submission.analysis.violations?.length ?? 0} found</span></div>
+          ${submission.analysis.violations?.length ? `<div class="finding-list">${submission.analysis.violations.map((finding) => {
+            const severity = String(finding.severity || 'unknown').toLowerCase();
+            const severityClass = ['critical', 'high', 'medium', 'low'].includes(severity) ? severity : 'unknown';
+            return `<article class="finding severity-${severityClass}">
+              <div class="finding-heading">
+                <strong>${escapeHtml(finding.ruleName || finding.ruleCode || 'Rule finding')}</strong>
+                <span class="severity-badge">${escapeHtml(finding.severity || 'Unspecified')}</span>
+              </div>
+              <p class="finding-meta">${escapeHtml(finding.ruleCode || '')}${finding.lineNumber ? ` · Line ${escapeHtml(finding.lineNumber)}` : ''}</p>
+              ${finding.evidence ? `<pre class="finding-evidence"><code>${escapeHtml(finding.evidence)}</code></pre>` : ''}
+              <p class="finding-fix">${escapeHtml(finding.suggestedFix || 'Review this code against the configured rule.')}</p>
+            </article>`;
+          }).join('')}</div>` : emptyState('No configured rule findings. This does not guarantee the code is free of defects.')}
+        </div>
         ${submission.sourceCode ? `<button class="button button-secondary run-sandbox" type="button" data-submission-id="${escapeHtml(submission.submissionId)}">Run in sandbox</button>` : ''}
       </section>`).join('')}</div>`;
 }
@@ -629,12 +689,16 @@ async function renderTeacherView() {
       selectedCourse = state.courses[0];
       state.selectedCourseCode = selectedCourse?.courseCode ?? null;
     }
-    if (!selectedCourse) return state.view === 'dashboard' ? renderTeacherCoursePicker() : emptyState('No active courses are assigned to your account.');
+    if (!selectedCourse) {
+      return state.view === 'dashboard'
+        ? `${renderDemoGuide('teacher')}${renderTeacherCoursePicker()}`
+        : emptyState('No active courses are assigned to your account.');
+    }
     const query = new URLSearchParams({ courseCode: selectedCourse.courseCode, semester: state.selectedSemester });
     const gradePayload = await api(`/api/teacher/course-grades?${query}`);
     if (state.view === 'edit-grade') return renderTeacherCourseGradeEditor(selectedCourse, gradePayload.grades);
     if (state.view === 'feedback') return renderTeacherCourseFeedback(selectedCourse, gradePayload.grades);
-    return renderTeacherCourseGrades(selectedCourse, gradePayload.grades);
+    return `${state.view === 'dashboard' ? renderDemoGuide('teacher') : ''}${renderTeacherCourseGrades(selectedCourse, gradePayload.grades)}`;
   }
 
   if (state.view === 'assignments') {
@@ -688,7 +752,10 @@ document.querySelector('#login-form').addEventListener('submit', async (event) =
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const errorElement = document.querySelector('#login-error');
+  const submitButton = event.currentTarget.querySelector('[type="submit"]');
   errorElement.textContent = '';
+  submitButton.disabled = true;
+  submitButton.textContent = 'Signing in…';
   try {
     const result = await api('/api/auth/login', {
       method: 'POST',
@@ -700,7 +767,20 @@ document.querySelector('#login-form').addEventListener('submit', async (event) =
     setSignedIn(result.user, result.token);
   } catch (error) {
     errorElement.textContent = error.message;
+  } finally {
+    submitButton.disabled = false;
+    submitButton.innerHTML = 'Sign in <span aria-hidden="true">&#8594;</span>';
   }
+});
+
+document.querySelector('.demo-access').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-demo-login]');
+  if (!button) return;
+  const account = demoAccounts[button.dataset.demoLogin];
+  if (!account) return;
+  document.querySelector('#username').value = account.username;
+  document.querySelector('#password-hash').value = account.passwordHash;
+  document.querySelector('#login-form').requestSubmit();
 });
 
 document.querySelector('#show-password-reset').addEventListener('click', () => {

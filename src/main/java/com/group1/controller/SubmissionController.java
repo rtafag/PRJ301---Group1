@@ -1,7 +1,9 @@
 package com.group1.controller;
 
 import com.group1.dao.SubmissionDAO;
+import com.group1.filter.SubmissionSecurityFilter;
 import com.group1.model.Submission;
+import com.group1.model.Users;
 import com.group1.util.DBConnection;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -11,12 +13,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -36,10 +37,41 @@ import javax.servlet.http.Part;
         maxRequestSize = 11 * 1024 * 1024
 )
 public class SubmissionController extends HttpServlet {
+    private static final long serialVersionUID = 1L;
     private static final long MAX_ARCHIVE_CONTENT_SIZE = 50L * 1024 * 1024;
     private static final int MAX_ARCHIVE_ENTRIES = 1000;
     private static final DateTimeFormatter SUBMITTED_AT_FORMAT =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+    @Override
+    protected void doGet(HttpServletRequest request, HttpServletResponse response)
+            throws ServletException, IOException {
+        HttpSession session = request.getSession(false);
+        Object sessionUserId = session == null ? null : session.getAttribute("userId");
+        if (!(sessionUserId instanceof String) || ((String) sessionUserId).trim().isEmpty()) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Please sign in to view your submissions.");
+            return;
+        }
+        Object currentUser = session.getAttribute("currentUser");
+        if (!(currentUser instanceof Users)
+                || !((String) sessionUserId).trim().equals(((Users) currentUser).getUserId())) {
+            response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Please sign in to view your submissions.");
+            return;
+        }
+        if (!"student".equalsIgnoreCase(((Users) currentUser).getRole())) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Only students may view the submission portal.");
+            return;
+        }
+
+        try (Connection connection = openConnection()) {
+            List<Submission> submissions = new SubmissionDAO(connection)
+                    .findByUserId(((String) sessionUserId).trim());
+            request.setAttribute("submissions", submissions);
+            request.getRequestDispatcher("/WEB-INF/views/submissions.jsp").forward(request, response);
+        } catch (SQLException exception) {
+            throw new ServletException("Unable to load your submissions.", exception);
+        }
+    }
 
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response)
@@ -52,6 +84,14 @@ public class SubmissionController extends HttpServlet {
         Object sessionUserId = session == null ? null : session.getAttribute("userId");
         if (!(sessionUserId instanceof String) || ((String) sessionUserId).trim().isEmpty()) {
             response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Please sign in before submitting a file.");
+            return;
+        }
+        Object currentUser = session.getAttribute("currentUser");
+        if (!(currentUser instanceof Users)
+                || !"student".equalsIgnoreCase(((Users) currentUser).getRole())
+                || !((String) sessionUserId).trim().equals(
+                        ((Users) currentUser).getUserId())) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Only authenticated students may submit files.");
             return;
         }
 
@@ -86,7 +126,11 @@ public class SubmissionController extends HttpServlet {
             return;
         }
 
-        String fileHash = sha256(archiveBytes);
+        Object filteredHash = request.getAttribute(SubmissionSecurityFilter.SUBMISSION_SHA256_ATTRIBUTE);
+        if (!(filteredHash instanceof String) || ((String) filteredHash).trim().isEmpty()) {
+            throw new ServletException("Submission hash filter did not provide the upload SHA-256.");
+        }
+        String fileHash = (String) filteredHash;
         String submissionId = "SUB-" + UUID.randomUUID().toString();
         Path savedFile = null;
         try (Connection connection = openConnection()) {
@@ -175,19 +219,6 @@ public class SubmissionController extends HttpServlet {
             }
         }
         return false;
-    }
-
-    private static String sha256(byte[] bytes) throws ServletException {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
-            StringBuilder hex = new StringBuilder(digest.length * 2);
-            for (byte value : digest) {
-                hex.append(String.format("%02x", value & 0xff));
-            }
-            return hex.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            throw new ServletException("SHA-256 is not available on this server.", exception);
-        }
     }
 
     private static void removeSavedFile(Path file) throws ServletException {
