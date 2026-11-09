@@ -62,11 +62,11 @@ public class ConsoleView {
     }
 
     public String promptPasswordHash() {
-        return readLine("Password hash: ").trim();
+        return readLine("Password (or hash): ").trim();
     }
 
     public void showInvalidCredentials() {
-        System.out.println("Invalid username, password hash, or role. Please try again.");
+        System.out.println("Invalid username, password, or role. Please try again.");
     }
 
     public int readStudentMenuOption() {

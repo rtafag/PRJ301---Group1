@@ -20,7 +20,7 @@ public class UsersDAO {
     private void createTable() {
         try (Statement s = conn.createStatement()) {
             s.execute("IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='Users' and xtype='U') " +
-                    "CREATE TABLE Users (user_id VARCHAR(50) PRIMARY KEY, username VARCHAR(100), password_hash VARCHAR(100), full_name NVARCHAR(100), email VARCHAR(100), role VARCHAR(50), created_at DATETIME)");
+                    "CREATE TABLE Users (user_id VARCHAR(50) PRIMARY KEY, username VARCHAR(100), password_hash VARCHAR(255), full_name NVARCHAR(100), email VARCHAR(100), role VARCHAR(50), created_at DATETIME)");
         } catch (Exception ignored) {
         }
     }
@@ -102,6 +102,27 @@ public class UsersDAO {
             }
         }
         return 0;
+    }
+
+    public boolean update(Users u) throws SQLException {
+        String sql = "UPDATE Users SET username = ?, password_hash = ?, full_name = ?, email = ?, role = ? WHERE user_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, u.username);
+            ps.setString(2, u.passwordHash);
+            ps.setString(3, u.fullName);
+            ps.setString(4, u.email);
+            ps.setString(5, u.role);
+            ps.setString(6, u.userId);
+            return ps.executeUpdate() > 0;
+        }
+    }
+
+    public boolean delete(String userId) throws SQLException {
+        String sql = "DELETE FROM Users WHERE user_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, userId);
+            return ps.executeUpdate() > 0;
+        }
     }
 
     private Users mapRow(ResultSet rs) throws SQLException {
