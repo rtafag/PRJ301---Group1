@@ -1,8 +1,12 @@
 package com.group1.controller;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import com.group1.filter.AuthFilter;
+import com.group1.filter.Sha256Filter;
+import com.group1.model.Users;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -21,19 +25,23 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import javax.servlet.DispatcherType;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpSession;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.After;
 import org.junit.Before;
@@ -52,6 +60,10 @@ public class SubmissionServletE2ETest {
         server = new Server(0);
         ServletContextHandler context = new ServletContextHandler(ServletContextHandler.SESSIONS);
         context.setContextPath("/");
+        context.addFilter(new FilterHolder(new AuthFilter()), "/student/submissions",
+                EnumSet.of(DispatcherType.REQUEST));
+        context.addFilter(new FilterHolder(new Sha256Filter()), "/student/submissions",
+                EnumSet.of(DispatcherType.REQUEST));
 
         ServletHolder submission = new ServletHolder(new TestSubmissionController(database));
         context.addServlet(submission, "/student/submissions");
@@ -79,23 +91,62 @@ public class SubmissionServletE2ETest {
     @Test
     public void submissionServletHashesAndRejectsDuplicateZipUploads() throws Exception {
         byte[] zip = createZip();
-        String cookie = loginAndGetSessionCookie();
+        String cookie = loginAndGetSessionCookie("Student");
+        String csrfToken = getCsrfToken(cookie);
 
         HttpResult unauthorized = upload(zip, null);
         assertEquals(HttpServletResponse.SC_UNAUTHORIZED, unauthorized.status);
 
-        HttpResult accepted = upload(zip, cookie);
+        HttpResult accepted = upload(zip, cookie, csrfToken);
         assertEquals(HttpServletResponse.SC_CREATED, accepted.status);
         String expectedHash = hex(MessageDigest.getInstance("SHA-256").digest(zip));
         assertTrue(accepted.body.contains("\"sha256\":\"" + expectedHash + "\""));
         assertTrue(database.containsHash(expectedHash));
 
-        HttpResult duplicate = upload(zip, cookie);
+        HttpResult duplicate = upload(zip, cookie, csrfToken);
         assertEquals(HttpServletResponse.SC_CONFLICT, duplicate.status);
     }
 
-    private String loginAndGetSessionCookie() throws IOException {
-        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + "/test-login").openConnection();
+    @Test
+    public void submissionFilterRejectsTeachersAndInvalidCsrfTokens() throws Exception {
+        byte[] zip = createZip();
+        String hash = hex(MessageDigest.getInstance("SHA-256").digest(zip));
+
+        for (String role : new String[] {"Teacher", "Admin"}) {
+            String cookie = loginAndGetSessionCookie(role);
+            assertEquals(HttpServletResponse.SC_FORBIDDEN, upload(zip, cookie, null).status);
+        }
+
+        String studentCookie = loginAndGetSessionCookie("Student");
+        String csrfToken = getCsrfToken(studentCookie);
+        assertTrue(csrfToken.matches("[A-Za-z0-9_-]{43}"));
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, upload(zip, studentCookie, "invalid-token").status);
+        assertFalse("The security filter must reject invalid requests before storing them.", database.containsHash(hash));
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, upload(zip, studentCookie, null).status);
+    }
+
+    @Test
+    public void submissionServletRejectsMissingCsrfAndInvalidZipArchives() throws Exception {
+        String cookie = loginAndGetSessionCookie("Student");
+        String csrfToken = getCsrfToken(cookie);
+        byte[] invalidZip = "not a ZIP archive".getBytes(StandardCharsets.UTF_8);
+        assertEquals(HttpServletResponse.SC_FORBIDDEN, upload(createZip(), cookie, null).status);
+        assertEquals(HttpServletResponse.SC_BAD_REQUEST, upload(invalidZip, cookie, csrfToken).status);
+        assertFalse(database.containsHash(hex(MessageDigest.getInstance("SHA-256").digest(invalidZip))));
+    }
+
+    @Test
+    public void authFilterRedirectsAnonymousPortalGetAndCreatesCsrfTokenForStudents() throws Exception {
+        HttpResult anonymous = getSubmissionPage(null);
+        assertEquals(HttpServletResponse.SC_FOUND, anonymous.status);
+
+        String cookie = loginAndGetSessionCookie("Student");
+        String csrfToken = getCsrfToken(cookie);
+        assertTrue(csrfToken.matches("[A-Za-z0-9_-]{43}"));
+    }
+
+    private String loginAndGetSessionCookie(String role) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + "/test-login?role=" + role).openConnection();
         try {
             assertEquals(HttpServletResponse.SC_NO_CONTENT, connection.getResponseCode());
             String setCookie = connection.getHeaderField("Set-Cookie");
@@ -106,7 +157,33 @@ public class SubmissionServletE2ETest {
         }
     }
 
+    private String getCsrfToken(String cookie) throws IOException {
+        HttpResult result = getSubmissionPage(cookie);
+        assertEquals(HttpServletResponse.SC_OK, result.status);
+        return result.body;
+    }
+
+    private HttpResult getSubmissionPage(String cookie) throws IOException {
+        HttpURLConnection connection = (HttpURLConnection) new URL(baseUrl + "/student/submissions").openConnection();
+        connection.setInstanceFollowRedirects(false);
+        if (cookie != null) {
+            connection.setRequestProperty("Cookie", cookie);
+        }
+        try {
+            int status = connection.getResponseCode();
+            InputStream responseStream = status < 400 ? connection.getInputStream() : connection.getErrorStream();
+            String body = responseStream == null ? "" : readText(responseStream);
+            return new HttpResult(status, body);
+        } finally {
+            connection.disconnect();
+        }
+    }
+
     private HttpResult upload(byte[] zip, String cookie) throws IOException {
+        return upload(zip, cookie, null);
+    }
+
+    private HttpResult upload(byte[] zip, String cookie, String csrfToken) throws IOException {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         write(body, "--" + BOUNDARY + "\r\n");
         write(body, "Content-Disposition: form-data; name=\"submissionFile\"; filename=\"project.zip\"\r\n");
@@ -118,6 +195,9 @@ public class SubmissionServletE2ETest {
         connection.setRequestMethod("POST");
         connection.setDoOutput(true);
         connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=" + BOUNDARY);
+        if (csrfToken != null) {
+            connection.setRequestProperty("X-CSRF-Token", csrfToken);
+        }
         if (cookie != null) {
             connection.setRequestProperty("Cookie", cookie);
         }
@@ -190,6 +270,13 @@ public class SubmissionServletE2ETest {
         protected Connection openConnection() {
             return database.openConnection();
         }
+
+        @Override
+        protected void doGet(HttpServletRequest request, HttpServletResponse response)
+                throws IOException {
+            response.setContentType("text/plain");
+            response.getWriter().write((String) request.getAttribute(AuthFilter.CSRF_SESSION_ATTRIBUTE));
+        }
     }
 
     private static final class TestLoginServlet extends HttpServlet {
@@ -198,7 +285,14 @@ public class SubmissionServletE2ETest {
         @Override
         protected void doGet(HttpServletRequest request, HttpServletResponse response)
                 throws IOException, ServletException {
-            request.getSession(true).setAttribute("userId", "E2E-STUDENT");
+            String role = request.getParameter("role");
+            if (role == null) {
+                role = "Student";
+            }
+            HttpSession session = request.getSession(true);
+            String userId = "E2E-" + role.toUpperCase();
+            session.setAttribute("currentUser", new Users(userId, "test", "", "", "", role, ""));
+            session.setAttribute("userId", userId);
             response.setStatus(HttpServletResponse.SC_NO_CONTENT);
         }
     }

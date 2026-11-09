@@ -284,8 +284,8 @@ Nhóm cam kết tuân thủ các nguyên tắc kỷ luật học thuật sau đ�
 ## 8. Hướng dẫn Cài đặt & Vận hành Thử nghiệm (Getting Started)
 
 ### 8.1. Yêu cầu Môi trường (Prerequisites)
-* **Java Development Kit (JDK):** Phiên bản 11 trở lên.
-* **Apache Maven:** 3.8+.
+* **Java Development Kit (JDK):** Phiên bản 25 (LTS) trở lên.
+* **Apache Maven:** 3.9+.
 * **Database:** Microsoft SQL Server (2019/2022 hoặc Azure SQL Edge).
 * **Containerization:** Docker Desktop.
 * **IDE:** IntelliJ IDEA / Eclipse / VS Code kèm Java Extension Pack.
@@ -307,6 +307,7 @@ PRJ301---Group1/
 │   └── Sample04_CleanSubmission_Good.java # Demo mã nguồn chuẩn đạt 10.0/10 (0% FP)
 ├── src/main/java/com/group1/
 │   ├── controller/               # Tầng Controller (AppController, SubmissionController, ...)
+│   ├── filter/                   # Filter xác thực sinh viên và CSRF cho Submission Portal
 │   ├── dao/                      # Tầng DAO (UsersDAO, SubmissionDAO, ScoreDAO, ...)
 │   ├── model/                    # Tầng Model (Users, Submission, AnalysisResult, Score, ...)
 │   ├── rule/                     # Module Lõi AST Rule Engine (TV3)
@@ -330,6 +331,7 @@ PRJ301---Group1/
 │   ├── util/                     # Hỗ trợ đọc CSV, băm SHA-256, DBConnection, JWT
 │   ├── DataGenerator.java        # Tiện ích sinh dữ liệu mẫu
 │   └── Main.java                 # Chương trình kiểm tra kết nối & nạp DB
+├── src/main/webapp/WEB-INF/views/ # JSP EL/JSTL cho đăng nhập, trang chủ, Submission Portal và dashboard AST
 ├── portal-node/                  # Cổng nộp bài Web Portal (Node/Express)
 ├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, ...)
 └── README.md                     # Tài liệu kiến trúc dự án & timeline
@@ -357,19 +359,51 @@ PRJ301---Group1/
      ```
    - **Cách 2: Sử dụng Apache Maven (nếu môi trường đã cài `mvn`):**
      ```powershell
-     mvn clean compile
+     mvn clean package
      mvn exec:java -Dexec.mainClass="com.group1.Main"
      ```
+     Lệnh `package` tạo thêm `target/PRJ301_AITA_DB-1.0-SNAPSHOT-webapp.war`; triển khai WAR này lên Servlet 4.0 container để chạy giao diện Java.
 5. **Kiểm tra kết quả:** Màn hình console sẽ thông báo `Connected to SQL Server!` thành công và hiển thị các bản ghi điểm số mẫu từ bảng `Score`.
 
-### 8.4. Kiểm thử tự động
+### 8.4. Submission Portal & AST Dashboard (Servlet/JSP)
+Đăng nhập với tài khoản sinh viên, sau đó mở `/student/submissions` để xem lịch sử và nộp tệp ZIP (tối đa 10 MB). `AuthFilter` xác thực session/role và CSRF header trước; `Sha256Filter` đọc có giới hạn, tính SHA-256 và chuyển byte/hash đã kiểm tra sang controller. `SubmissionController` kiểm tra cấu trúc ZIP an toàn, chống nộp trùng, lưu artifact và ghi nhận submission.
+
+Mở `/analysis-dashboard` để xem kết quả phân tích AST, mức độ nghiêm trọng, vị trí dòng, mô tả và gợi ý sửa. Sinh viên chỉ thấy kết quả thuộc bài nộp của mình; giảng viên/quản trị viên xem được toàn bộ kết quả. Bộ lọc trên trang cho phép lọc theo severity và tìm theo tên rule, tệp hoặc mô tả. Dữ liệu được xuất bằng JSTL `c:out` để escape nội dung động.
+
+Wireframe, use-case, luồng sinh viên/giảng viên, ma trận kiểm thử đa vai trò và biểu mẫu ghi nhận phản hồi UX nằm trong [docs/TV4-UI-UX.md](docs/TV4-UI-UX.md). Upload Servlet hiện chỉ ghi nhận bài nộp; việc chuyển bài mới sang AST/Redis worker chưa được tích hợp.
+
+### 8.5. Kịch bản demo UI TV4 (khoảng 5 phút)
+
+**Chuẩn bị trước buổi demo**
+
+1. Chạy SQL Server, cấu hình `DB_URL`, `DB_USER`, `DB_PASSWORD`, triển khai WAR lên Servlet 4.0 container. Mở `/login` nếu WAR chạy ở root context; nếu container dùng tên WAR làm context (ví dụ Tomcat với `PRJ301_AITA_DB-1.0-SNAPSHOT-webapp.war`), thêm prefix `/PRJ301_AITA_DB-1.0-SNAPSHOT-webapp` trước các route, ví dụ `/PRJ301_AITA_DB-1.0-SNAPSHOT-webapp/login`.
+2. Cần có dữ liệu mẫu liên kết đủ `Users` → `Submission` → `AnalysisResult` → `RuleViolation` → `RuleDefinition`. Nếu cần nạp CSV, chỉ chạy `DatabaseSeeder` trên database demo dùng riêng: seeder sẽ xóa và tạo lại các bảng AITA trước khi import.
+3. Với dữ liệu CSV hiện tại, dùng sinh viên `dungvo658` (HE039, có bài phân tích mẫu SUB0001) và giảng viên `sondang619` (GV0001); mật khẩu demo khớp giá trị `password_hash` trong `data/users.csv` (`hash_dungvo658` và `hash_sondang619`). Đây chỉ là tài khoản mẫu, không dùng trong môi trường thật.
+4. Mở hai browser profile riêng hoặc cửa sổ riêng tư để giữ session của giảng viên và sinh viên độc lập. Chuẩn bị một ZIP nhỏ có mã nguồn; dùng ZIP mới cho mỗi lần chạy vì bài nộp trùng SHA-256 sẽ bị từ chối.
+
+**Luồng sinh viên**
+
+1. Đăng nhập bằng tài khoản sinh viên và mở **Kết quả phân tích AST** từ trang chủ; nếu thử mở `/scores`, hệ thống phải từ chối quyền truy cập.
+2. Tìm/lọc phát hiện theo severity; mở gợi ý sửa và vị trí file/dòng. Xác nhận dashboard chỉ hiển thị bài của sinh viên đang đăng nhập.
+3. Về trang chủ → **Cổng nộp bài**, chọn ZIP và nộp. Xác nhận bài mới xuất hiện trong lịch sử với trạng thái `Submitted`; Filter chặn file sai định dạng, người chưa đăng nhập, vai trò khác và CSRF token không hợp lệ.
+4. Nếu ZIP mới chưa có AnalysisResult, đó là trạng thái mong đợi: demo hiện ghi nhận bài nộp, không tự chạy phân tích AST trong request upload. Dùng bài SUB0001 đã seed để trình diễn màn hình kết quả.
+
+**Luồng giảng viên**
+
+1. Đăng nhập tài khoản giảng viên ở browser profile thứ hai.
+2. Mở **Kết quả phân tích AST**. Xác nhận có thể xem bài của nhiều sinh viên, lọc severity/tìm lỗi và trình bày mô tả, vị trí, điểm trừ, gợi ý sửa.
+3. Mở **Bảng điểm** để minh họa điểm của toàn lớp, sau đó đăng xuất. Nếu thử mở `/student/submissions`, quyền truy cập phải bị từ chối.
+
+**Kết quả mong đợi:** sinh viên không nhìn thấy bài của người khác; giảng viên xem được dữ liệu toàn hệ thống; không có trang lỗi, màn hình loading kéo dài hoặc dữ liệu cá nhân trong URL. Giữ sẵn trang dashboard của sinh viên đã seed làm đường lui nếu SQL Server hoặc thời gian xử lý upload gặp trục trặc.
+
+### 8.6. Kiểm thử tự động
 Chạy toàn bộ unit test và kiểm thử tích hợp HTTP cho luồng Servlet nộp ZIP:
 
 ```powershell
 mvn --batch-mode test
 ```
 
-`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart tới `SubmissionController`, kiểm tra yêu cầu session, SHA-256, lưu bài và chặn bài trùng. SHA-256 được tính trực tiếp trong servlet, chưa chạy qua Filter. Kiểm thử dùng JDBC test double nên không cần SQL Server.
+`SubmissionServletE2ETest` kiểm tra luồng nộp multipart, quyền sinh viên, CSRF, SHA-256 và chống nộp trùng. `AnalysisDashboardControllerTest` kiểm tra luồng sinh viên chỉ xem được bài của mình, giảng viên xem kết quả toàn hệ thống, người chưa đăng nhập và session không khớp bị chặn. `DashboardAccessTest` kiểm tra trang chủ cần đăng nhập và sinh viên không thể đọc toàn bộ điểm giảng viên. Các test dùng JDBC test double nên không cần SQL Server.
 
 ---
 *Bản quyền tài liệu thuộc về **Nhóm 1 – PRJ301 (AITA Project)** | Lưu trữ tại GitHub: [rtafag/PRJ301---Group1](https://github.com/rtafag/PRJ301---Group1). Được cập nhật và hoàn thiện theo Đề cương chi tiết 10 tuần và Rubric Đánh giá Học thuật.*

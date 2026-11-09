@@ -1,27 +1,29 @@
 package com.group1.dao;
 
 import com.group1.model.AnalysisResult;
+import com.group1.model.AnalysisDashboardItem;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 public class AnalysisResultDAO {
     private final Connection conn;
 
-    public AnalysisResultDAO(Connection c) {
+    public AnalysisResultDAO(Connection c) throws SQLException {
         this.conn = c;
         createTable();
     }
 
-    private void createTable() {
+    private void createTable() throws SQLException {
         try (Statement s = conn.createStatement()) {
             s.execute("IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AnalysisResult' and xtype='U') " +
                     "CREATE TABLE AnalysisResult (analysis_id INT PRIMARY KEY, submission_id VARCHAR(50), ast_json NVARCHAR(MAX), ai_feedback NVARCHAR(MAX), execution_time_ms INT)");
-        } catch (Exception ignored) {
         }
     }
 
@@ -75,6 +77,62 @@ public class AnalysisResultDAO {
             }
         }
         return null;
+    }
+
+    public List<AnalysisDashboardItem> findDashboardByUserId(String userId) throws SQLException {
+        if (userId == null || userId.trim().isEmpty()) {
+            throw new IllegalArgumentException("A user ID is required to load a student dashboard.");
+        }
+        return findDashboard(userId.trim());
+    }
+
+    public List<AnalysisDashboardItem> findAllForDashboard() throws SQLException {
+        return findDashboard(null);
+    }
+
+    private List<AnalysisDashboardItem> findDashboard(String userId) throws SQLException {
+        String sql = "SELECT ar.analysis_id, ar.submission_id, ar.ai_feedback, ar.execution_time_ms, "
+                + "rv.violation_id, rv.file_name, rv.line_number, rv.suggested_fix, "
+                + "rd.rule_code, rd.rule_name, rd.severity, rd.penalty_points, rd.description "
+                + "FROM AnalysisResult ar "
+                + "INNER JOIN Submission s ON s.submission_id = ar.submission_id "
+                + "LEFT JOIN RuleViolation rv ON rv.analysis_id = ar.analysis_id "
+                + "LEFT JOIN RuleDefinition rd ON rd.rule_id = rv.rule_id "
+                + (userId == null ? "" : "WHERE s.user_id = ? ")
+                + "ORDER BY s.submitted_at DESC, ar.analysis_id DESC, rv.violation_id";
+        Map<Integer, AnalysisDashboardItem> itemsById = new LinkedHashMap<>();
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (userId != null) {
+                ps.setString(1, userId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    int analysisId = rs.getInt("analysis_id");
+                    AnalysisDashboardItem item = itemsById.get(analysisId);
+                    if (item == null) {
+                        item = new AnalysisDashboardItem(
+                                analysisId,
+                                rs.getString("submission_id"),
+                                rs.getString("ai_feedback"),
+                                rs.getInt("execution_time_ms"));
+                        itemsById.put(analysisId, item);
+                    }
+
+                    if (rs.getObject("violation_id") != null) {
+                        item.addFinding(new AnalysisDashboardItem.Finding(
+                                rs.getString("rule_code"),
+                                rs.getString("rule_name"),
+                                rs.getString("severity"),
+                                rs.getFloat("penalty_points"),
+                                rs.getString("description"),
+                                rs.getString("file_name"),
+                                rs.getInt("line_number"),
+                                rs.getString("suggested_fix")));
+                    }
+                }
+            }
+        }
+        return new ArrayList<>(itemsById.values());
     }
 
     public int count() throws SQLException {
