@@ -55,6 +55,24 @@
             <artifactId>mssql-jdbc</artifactId>
             <version>10.2.3.jre8</version>
         </dependency>
+        <!-- Standard JPA / ORM Persistence API -->
+        <dependency>
+            <groupId>javax.persistence</groupId>
+            <artifactId>javax.persistence-api</artifactId>
+            <version>2.2</version>
+        </dependency>
+        <!-- Hibernate ORM Core Engine (JPA Provider) -->
+        <dependency>
+            <groupId>org.hibernate</groupId>
+            <artifactId>hibernate-core</artifactId>
+            <version>5.6.15.Final</version>
+        </dependency>
+        <!-- JSTL for MVC2 JSP Views -->
+        <dependency>
+            <groupId>jstl</groupId>
+            <artifactId>jstl</artifactId>
+            <version>1.2</version>
+        </dependency>
     </dependencies>
 
     <build>

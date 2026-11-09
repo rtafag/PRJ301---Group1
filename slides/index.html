@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AITA - Slide Thuyết Trình Đồ Án PRJ301 (Nhóm 1)</title>
+    <style>
+        :root {
+            --bg-dark: #0a0f1d;
+            --bg-card: #131b2e;
+            --bg-card-hover: #1b2640;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --cyan-accent: #00b4d8;
+            --cyan-glow: rgba(0, 180, 216, 0.4);
+            --amber-accent: #f59e0b;
+            --amber-glow: rgba(245, 158, 11, 0.4);
+            --navy-border: #1e293b;
+            --success-green: #10b981;
+            --font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-family);
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            position: relative;
+        }
+
+        /* Tech circuit background decoration */
+        .circuit-bg {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 0;
+            background: 
+                radial-gradient(circle at 10% 20%, rgba(0, 180, 216, 0.08) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(245, 158, 11, 0.06) 0%, transparent 40%);
+        }
+
+        .circuit-lines {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(to right, rgba(255,255,255,0.02) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255,255,255,0.02) 1px, transparent 1px);
+            background-size: 60px 60px;
+        }
+
+        /* Header Navigation */
+        header {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 40px;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            background: rgba(10, 15, 29, 0.85);
+            backdrop-filter: blur(10px);
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-badge {
+            background: linear-gradient(135deg, var(--cyan-accent), #0077b6);
+            color: #fff;
+            font-weight: 800;
+            font-size: 14px;
+            padding: 5px 12px;
+            border-radius: 6px;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px var(--cyan-glow);
+        }
+
+        .project-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .slide-counter {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--cyan-accent);
+            background: rgba(0, 180, 216, 0.1);
+            padding: 4px 14px;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 180, 216, 0.3);
+        }
+
+        /* Slide Container */
+        main {
+            position: relative;
+            z-index: 5;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px 50px;
+        }
+
+        .slide {
+            display: none;
+            width: 100%;
+            max-width: 1280px;
+            height: 100%;
+            max-height: 720px;
+            animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .slide.active {
+            display: flex;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px) scale(0.99);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        /* Slide Titles */
+        .slide-header {
+            margin-bottom: 24px;
+        }
+
+        .slide-tag {
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--amber-accent);
+            font-weight: 700;
+            margin-bottom: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .slide-tag::before {
+            content: "";
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: var(--amber-accent);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--amber-glow);
+        }
+
+        .slide-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.25;
+        }
+
+        .slide-subtitle {
+            font-size: 16px;
+            color: var(--text-muted);
+            margin-top: 6px;
+        }
+
+        /* Content Grid */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--navy-border);
+            border-radius: 12px;
+            padding: 24px;
+            position: relative;
+            transition: all 0.3s ease;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+
+        .card:hover {
+            border-color: rgba(0, 180, 216, 0.4);
+            transform: translateY(-3px);
+            box-shadow: 0 12px 30px rgba(0, 180, 216, 0.15);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            padding-bottom: 12px;
+        }
+
+        .card-icon {
+            width: 38px;
+            height: 38px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            background: rgba(0, 180, 216, 0.15);
+            color: var(--cyan-accent);
+            border: 1px solid rgba(0, 180, 216, 0.3);
+        }
+
+        .card-icon.amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber-accent);
+            border-color: rgba(245, 158, 11, 0.3);
+        }
+
+        .card-icon.green {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-green);
+            border-color: rgba(16, 185, 129, 0.3);
+        }
+
+        .card-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #ffffff;
+        }
+
+        .card-badge {
+            margin-left: auto;
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.06);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .card-badge.cyan {
+            background: rgba(0, 180, 216, 0.15);
+            color: var(--cyan-accent);
+        }
+
+        .card-badge.amber {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--amber-accent);
+        }
+
+        .card-badge.green {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success-green);
+        }
+
+        .task-list {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .task-item {
+            font-size: 14px;
+            line-height: 1.5;
+            color: var(--text-muted);
+            display: flex;
+            gap: 10px;
+        }
+
+        .task-item strong {
+            color: #ffffff;
+        }
+
+        .task-item::before {
+            content: "▹";
+            color: var(--cyan-accent);
+            font-weight: bold;
+        }
+
+        /* Highlight Metric Box */
+        .metric-box {
+            background: linear-gradient(135deg, rgba(0, 180, 216, 0.1), rgba(245, 158, 11, 0.05));
+            border: 1px solid rgba(0, 180, 216, 0.25);
+            border-radius: 10px;
+            padding: 14px 18px;
+            margin-top: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .metric-label {
+            font-size: 13px;
+            color: var(--text-muted);
+        }
+
+        .metric-val {
+            font-size: 18px;
+            font-weight: 800;
+            color: var(--cyan-accent);
+        }
+
+        /* Speaker Note Callout */
+        .speaker-box {
+            background: rgba(15, 23, 42, 0.7);
+            border-left: 3px solid var(--amber-accent);
+            padding: 12px 16px;
+            margin-top: 16px;
+            border-radius: 0 8px 8px 0;
+            font-size: 13px;
+            color: #cbd5e1;
+            font-style: italic;
+        }
+
+        /* Footer Controls */
+        footer {
+            position: relative;
+            z-index: 10;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 40px;
+            border-top: 1px solid rgba(255,255,255,0.08);
+            background: rgba(10, 15, 29, 0.85);
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn {
+            background: var(--bg-card);
+            border: 1px solid var(--navy-border);
+            color: #ffffff;
+            font-size: 14px;
+            font-weight: 600;
+            padding: 8px 18px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn:hover {
+            background: var(--bg-card-hover);
+            border-color: var(--cyan-accent);
+            color: var(--cyan-accent);
+        }
+
+        .btn.primary {
+            background: var(--cyan-accent);
+            color: #000000;
+            border-color: var(--cyan-accent);
+            font-weight: 700;
+        }
+
+        .btn.primary:hover {
+            background: #48cae4;
+            box-shadow: 0 0 15px var(--cyan-glow);
+        }
+
+        /* Progress Bar */
+        .progress-bar-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 3px;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .progress-bar {
+            height: 100%;
+            background: linear-gradient(to right, var(--cyan-accent), var(--amber-accent));
+            width: 5%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <div class="circuit-bg">
+        <div class="circuit-lines"></div>
+    </div>
+
+    <div class="progress-bar-container">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+
+    <!-- Header -->
+    <header>
+        <div class="logo-area">
+            <span class="logo-badge">AITA</span>
+            <span class="project-title">AI-Powered Teaching Assistant System — Môn PRJ301 (Nhóm 1)</span>
+        </div>
+        <div class="slide-counter" id="slideIndicator">Slide 1 / 18</div>
+    </header>
+
+    <!-- Slides Container -->
+    <main>
+        <!-- SLIDE 1: BÌA CHÍNH -->
+        <div class="slide active">
+            <div class="slide-header" style="text-align: center; margin-bottom: 30px;">
+                <div class="slide-tag" style="justify-content: center;">Báo Cáo Nghiên Cứu & Phát Triển (RBL)</div>
+                <h1 class="slide-title" style="font-size: 42px; margin-top: 10px;">AITA: HỆ THỐNG TRỢ GIẢNG AI CHẤM MÃ NGUỒN TỰ ĐỘNG</h1>
+                <p class="slide-subtitle" style="font-size: 18px; margin-top: 12px; color: var(--cyan-accent);">Phân ban: AI Static Code Analysis & Abstract Syntax Tree (AST)</p>
+            </div>
+
+            <div class="grid-4" style="margin-top: 10px;">
+                <div class="card" style="text-align: center; border-top: 3px solid var(--cyan-accent);">
+                    <div class="card-icon" style="margin: 0 auto 12px;">👑</div>
+                    <div class="card-title">TV1 (Trưởng nhóm)</div>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">AST Core Engine Lead</p>
+                    <span class="card-badge cyan" style="margin-top: 10px; display: inline-block;">Application (25đ)</span>
+                </div>
+                <div class="card" style="text-align: center; border-top: 3px solid var(--amber-accent);">
+                    <div class="card-icon amber" style="margin: 0 auto 12px;">🗄️</div>
+                    <div class="card-title">TV2</div>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">Backend & DB Engineer</p>
+                    <span class="card-badge amber" style="margin-top: 10px; display: inline-block;">Database Design (10đ)</span>
+                </div>
+                <div class="card" style="text-align: center; border-top: 3px solid #38bdf8;">
+                    <div class="card-icon" style="margin: 0 auto 12px; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">🧠</div>
+                    <div class="card-title">TV3</div>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">AI Rule & Detection</p>
+                    <span class="card-badge cyan" style="margin-top: 10px; display: inline-block;">AI Integration (10đ)</span>
+                </div>
+                <div class="card" style="text-align: center; border-top: 3px solid var(--success-green);">
+                    <div class="card-icon green" style="margin: 0 auto 12px;">💻</div>
+                    <div class="card-title">TV4 & TV5</div>
+                    <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">UI/UX & Sandbox/DevOps</p>
+                    <span class="card-badge green" style="margin-top: 10px; display: inline-block;">Sandbox (30%) + UI (10đ)</span>
+                </div>
+            </div>
+
+            <div class="speaker-box" style="margin-top: 25px; text-align: center;">
+                🎤 <strong>Nguyên tắc bảo vệ:</strong> Cả 5 thành viên đều trực tiếp thuyết trình theo đúng chuyên môn qua 4 mốc (Tuần 1-3, Tuần 4-6, Tuần 7-9 và Final Demo Tuần 10).
+            </div>
+        </div>
+
+        <!-- SLIDE 2: KIẾN TRÚC TỔNG THỂ -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">Kiến Trúc Kỹ Thuật Hệ Thống</div>
+                <h2 class="slide-title">Pipeline Xử Lý & Chấm Điểm Mã Nguồn AITA</h2>
+                <p class="slide-subtitle">Luồng dữ liệu khép kín từ lúc sinh viên nộp bài đến khi xuất báo cáo sư phạm</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">1</div>
+                        <div>
+                            <div class="card-title">Tiếp Nhận & Bảo Mật</div>
+                            <span class="card-badge cyan">TV4 + TV5</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Submission Portal:</strong> Sinh viên nộp ZIP hoặc file Java qua Servlet/JSP (MVC2).</li>
+                        <li class="task-item"><strong>Security Filter:</strong> Nén ZIP an toàn (chống Zip-slip, Zip-bomb).</li>
+                        <li class="task-item"><strong>SHA-256 Hash:</strong> Băm toàn vẹn mã nguồn chống nộp trùng.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">2</div>
+                        <div>
+                            <div class="card-title">Cách Ly & Phân Tích AST</div>
+                            <span class="card-badge amber">TV1 + TV5</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Docker Sandbox:</strong> Môi trường cô lập giới hạn RAM/CPU, ngắt mạng (--network=none).</li>
+                        <li class="task-item"><strong>AST Core Engine:</strong> Bóc tách mã Java thành Cây cú pháp trừu tượng bằng JavaParser.</li>
+                        <li class="task-item"><strong>JSON Schema:</strong> Xuất cấu trúc AST đồng bộ cho Rule Engine.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">3</div>
+                        <div>
+                            <div class="card-title">AI Engine & Trực Quan Hóa</div>
+                            <span class="card-badge green">TV3 + TV2</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>15 AST Visitors:</strong> Bắt 15 lỗi logic (vô hạn, rò rỉ JDBC, String ==, chia cho 0).</li>
+                        <li class="task-item"><strong>AIService:</strong> OpenAI / Gemini giải thích sư phạm tự nhiên (Markdown).</li>
+                        <li class="task-item"><strong>6-Table Persistence:</strong> Lưu kết quả vào SQL Server & hiển thị lên Dashboard.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">⚡ Tiêu chí đánh giá hệ thống:</span>
+                <span class="metric-val">Sandbox Compliance (30%) | MVC2 Clean Code (40%) | Peer Defense (30%)</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 3: TV1 (TUẦN 1 - 3: PR1) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV1 - Trưởng Nhóm | AST Core Engine Lead</div>
+                <h2 class="slide-title">Tuần 1 - 3 (Peer-Review 1): Thiết Kế Kiến Trúc & AST Pipeline</h2>
+                <p class="slide-subtitle">Xác định kiến trúc luồng dữ liệu AST và lên kế hoạch bộ bóc tách cú pháp</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🛠️</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">Kiến trúc & Kế hoạch</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Sơ đồ khối hệ thống:</strong> Thiết kế sơ đồ tổng thể AITA, phân định ranh giới giữa AST Engine, Backend SQL Server và Frontend JSP.</li>
+                        <li class="task-item"><strong>Đặc tả luồng dữ liệu:</strong> Định nghĩa luồng trung chuyển từ Source Code $\rightarrow$ AST Syntax Tree $\rightarrow$ CSDL $\rightarrow$ UI.</li>
+                        <li class="task-item"><strong>Kế hoạch AST Core:</strong> Khảo sát thư viện JavaParser 3.25.10, định dạng đầu vào và cấu trúc JSON metadata mong đợi.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🎤</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR1 (4-5 phút)</div>
+                            <span class="card-badge amber">Bảo vệ đồ án</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Trình bày kiến trúc tổng thể:</strong> Nêu rõ vai trò của AST Core như trái tim của hệ thống chấm bài tĩnh.</li>
+                        <li class="task-item"><strong>Lộ trình 5 tuần tiếp theo:</strong> Cam kết lộ trình xây dựng Syntax Visitor và giải tỏa rủi ro tích hợp.</li>
+                        <li class="task-item"><strong>Điều phối mở đầu:</strong> Giới thiệu phân công 5 thành viên và kết nối sang phần CSDL của TV2.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                💬 <strong>Điểm mấu chốt:</strong> TV1 chứng minh được sự đồng thuận về kiến trúc kỹ thuật của cả 5 thành viên ngay từ tuần đầu tiên.
+            </div>
+        </div>
+
+        <!-- SLIDE 4: TV1 (TUẦN 4 - 6: PR2) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV1 - Trưởng Nhóm | AST Core Engine Lead</div>
+                <h2 class="slide-title">Tuần 4 - 6 (Peer-Review 2): Hoàn Thiện Core Parser & JSON Schema</h2>
+                <p class="slide-subtitle">Triển khai parser với JavaParser và chuẩn hóa dữ liệu đầu ra cho Rule Engine</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">⚙️</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">AST Engine v1</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Tích hợp StaticJavaParser:</strong> Biên dịch thành công module bóc tách mã nguồn thành CompilationUnit.</li>
+                        <li class="task-item"><strong>Cấu trúc Syntax Visitor nền tảng:</strong> Xây dựng mẫu duyệt cây cú pháp VoidVisitorAdapter chuẩn hóa.</li>
+                        <li class="task-item"><strong>JSON Schema đầu ra:</strong> Sinh metadata cấu trúc code: {classes: X, methods: Y, syntaxValid: true} cho CSDL và UI.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🖥️</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR2 (Demo Lớn)</div>
+                            <span class="card-badge amber">Live Demo</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Demo Live AST Parsing:</strong> Đưa vào một đoạn mã Java thật và hiển thị cây cú pháp bóc tách thời gian thực.</li>
+                        <li class="task-item"><strong>Giải thích giao tiếp liên module:</strong> Trình diễn cách TV3 (Rule Engine) và TV4 (UI) tiêu thụ output JSON Schema.</li>
+                        <li class="task-item"><strong>Trả lời Q&A:</strong> Bảo vệ tính ưu việt của duyệt AST so với regex quét text thông thường.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">⚡ Hiệu năng AST Core:</span>
+                <span class="metric-val">Thời gian parse trung bình: 80 - 150ms / file Java</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 5: TV1 (TUẦN 7 - 9: PR3 & TUẦN 10: FINAL DEMO) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV1 - Trưởng Nhóm | AST Core Engine Lead</div>
+                <h2 class="slide-title">Tuần 7 - 9 (PR3) & Tuần 10: Tích Hợp Đa File & Điều Phối Toàn Hệ Thống</h2>
+                <p class="slide-subtitle">Tích hợp sâu rộng cùng Rule Engine, xử lý code phức tạp và chốt gói phát hành</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🚀</div>
+                        <div>
+                            <div class="card-title">Tuần 7 - 9 (Peer-Review 3)</div>
+                            <span class="card-badge cyan">Tích hợp nâng cao</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Tích hợp sâu cùng TV3:</strong> Nối 15 AST Visitors vào pipeline, đảm bảo không nghẽn luồng.</li>
+                        <li class="task-item"><strong>Xử lý cấu trúc phức tạp:</strong> Bóc tách chính xác các inner class, anonymous class, nested loops và lambda expression.</li>
+                        <li class="task-item"><strong>Thuyết trình PR3:</strong> Báo cáo các sự cố kỹ thuật đã giải quyết khi ghép nối module.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">🏆</div>
+                        <div>
+                            <div class="card-title">Tuần 10 (Final Demo)</div>
+                            <span class="card-badge green">Bảo vệ chung cuộc</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Rà soát Release Package:</strong> Kiểm tra tính toàn vẹn của mã nguồn, CSDL, tài liệu README.</li>
+                        <li class="task-item"><strong>Điều phối Demo:</strong> Mở đầu giới thiệu tổng quan hệ thống AITA, kết nối nhịp nhàng qua 5 thành viên.</li>
+                        <li class="task-item"><strong>Chủ trì Q&A:</strong> Bảo vệ kiến trúc tổng thể, bảo đảm tiêu chí 25đ Application.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                🎤 <strong>Tuyên ngôn TV1:</strong> "AITA không chỉ là một ứng dụng web MVC2, mà là một hệ thống phân tích cú pháp tĩnh thực thụ đạt chuẩn học thuật."
+            </div>
+        </div>
+
+        <!-- SLIDE 6: TV2 (TUẦN 1 - 3: PR1) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV2 - Backend & Database Engineer</div>
+                <h2 class="slide-title">Tuần 1 - 3 (Peer-Review 1): Thiết Kế ERD 6 Bảng & CSDL Thật</h2>
+                <p class="slide-subtitle">Xây dựng nền móng cơ sở dữ liệu trên Microsoft SQL Server và cơ chế xác thực JWT</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🗄️</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge amber">Database Design</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>ERD 6 bảng chuẩn hóa:</strong> Users, Submission, AnalysisResult, RuleViolation, RuleDefinition, Score.</li>
+                        <li class="task-item"><strong>Tạo CSDL thật trên SQL Server:</strong> Chạy script tạo bảng và ràng buộc khóa ngoại (FK) trên SSMS.</li>
+                        <li class="task-item"><strong>JWT Authentication:</strong> Khởi tạo tiện ích JwtUtil tạo và xác thực token đăng nhập.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎤</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR1 (4-5 phút)</div>
+                            <span class="card-badge cyan">Bảo vệ CSDL</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Thuyết trình ERD 6 bảng:</strong> Giải thích lý do quan hệ 1-N, 1-1 giữa Submission và kết quả phân tích.</li>
+                        <li class="task-item"><strong>Demo Live trên SSMS:</strong> Trực tiếp mở SQL Server Management Studio chứng minh bảng thật, không chỉ thiết kế giấy.</li>
+                        <li class="task-item"><strong>Demo JWT Token:</strong> Trình diễn sinh token mã hóa khi đăng nhập tài khoản.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">📌 Điểm nhấn Rubric:</span>
+                <span class="metric-val">Đạt trọn vẹn 10 điểm Database Design (ERD đủ 6 bảng thật)</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 7: TV2 (TUẦN 4 - 6: PR2) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV2 - Backend & Database Engineer</div>
+                <h2 class="slide-title">Tuần 4 - 6 (Peer-Review 2): Hoàn Thiện Tầng DAO/JDBC & Sample Data</h2>
+                <p class="slide-subtitle">Kết nối CSDL vào hệ thống Java Web và chuẩn bị 200 bản ghi dữ liệu mẫu</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">💾</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge amber">Tầng DAO & Dữ liệu</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Hoàn thiện 6 lớp DAO:</strong> UsersDAO, SubmissionDAO, AnalysisResultDAO, RuleViolationDAO, RuleDefinitionDAO, ScoreDAO.</li>
+                        <li class="task-item"><strong>DatabaseSeeder & CSVHelper:</strong> Bộ công cụ đọc CSV tự động nạp hơn 200 submissions và 1,100 users vào SQL Server.</li>
+                        <li class="task-item"><strong>Tối ưu DBConnection:</strong> Quản lý kết nối an toàn, bọc try-with-resources tránh cạn kiệt connection.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🖥️</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR2</div>
+                            <span class="card-badge cyan">Demo Dữ liệu</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Demo tầng DAO/JDBC:</strong> Cách Submission Portal (TV4) ghi nhận và truy vấn dữ liệu từ SQL Server.</li>
+                        <li class="task-item"><strong>Chứng minh dữ liệu thật:</strong> Hiển thị 200 bản ghi bài nộp mẫu phân bố điểm số tự nhiên.</li>
+                        <li class="task-item"><strong>Trả lời Q&A:</strong> Cơ chế xử lý tranh chấp dữ liệu khi nhiều sinh viên nộp bài cùng lúc.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                💬 <strong>Điểm mạnh:</strong> Tầng dữ liệu tách bạch hoàn toàn với controller, tuân thủ đúng chuẩn MVC2.
+            </div>
+        </div>
+
+        <!-- SLIDE 8: TV2 (TUẦN 7 - 9: PR3 & TUẦN 10: FINAL DEMO) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV2 - Backend & Database Engineer</div>
+                <h2 class="slide-title">Tuần 7 - 9 (PR3) & Tuần 10: Kiến Trúc ORM Transactional & Toàn Vẹn</h2>
+                <p class="slide-subtitle">Triển khai dịch vụ Grading Job đồng bộ trạng thái và bảo vệ tính toàn vẹn trước Hội đồng</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🔄</div>
+                        <div>
+                            <div class="card-title">Tuần 7 - 9 (Peer-Review 3)</div>
+                            <span class="card-badge amber">Transactional ORM</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>GradingJobORMService:</strong> Cập nhật trạng thái chấm bài nguyên tử (Atomic Transaction).</li>
+                        <li class="task-item"><strong>Đồng bộ 3 bảng trọng yếu:</strong> Đảm bảo Submission (status) $\leftrightarrow$ AnalysisResult $\leftrightarrow$ Score luôn nhất quán.</li>
+                        <li class="task-item"><strong>Demo PR3:</strong> Mô phỏng tiến trình cập nhật điểm số qua Job Queue không bị lệch dữ liệu.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">🏆</div>
+                        <div>
+                            <div class="card-title">Tuần 10 (Final Demo)</div>
+                            <span class="card-badge green">Bảo vệ chung cuộc</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Kiểm tra toàn vẹn CSDL:</strong> Rà soát tính nhất quán của khóa ngoại, ràng buộc điểm số (0 - 10đ).</li>
+                        <li class="task-item"><strong>Demo CSDL trực tiếp:</strong> Truy vấn các bài nộp vừa chấm và chứng minh điểm số lưu chuẩn xác.</li>
+                        <li class="task-item"><strong>Trả lời Q&A:</strong> Bảo vệ thiết kế chuẩn hóa 3NF, xử lý Transaction Isolation trong SQL Server.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">📊 Trạng thái dữ liệu:</span>
+                <span class="metric-val">100% Khóa ngoại hợp lệ | Không có dữ liệu mồ côi (Zero Orphan Records)</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 9: TV3 (TUẦN 1 - 3: PR1) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV3 - AI Rule & Detection Engineer (Trọng Tâm)</div>
+                <h2 class="slide-title">Tuần 1 - 3 (Peer-Review 1): Khảo Sát Danh Mục Rule & Thử Nghiệm AI</h2>
+                <p class="slide-subtitle">Đặt nền tảng lý thuyết cho bộ quy tắc phát hiện lỗi logic và kết nối thử nghiệm Cloud AI</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">🧠</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">Khảo sát & AI Test</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Khảo sát chuẩn công nghiệp:</strong> Tổng hợp danh mục lỗi thường gặp của sinh viên dựa trên SonarQube Java Rules và PMD.</li>
+                        <li class="task-item"><strong>Lập danh mục Rule dự kiến:</strong> Xác định các nhóm lỗi: Lỗi sập ứng dụng (Null check, Vòng lặp vô hạn), Rò rỉ tài nguyên, Code smell.</li>
+                        <li class="task-item"><strong>Thử nghiệm gọi API AI:</strong> Tạo kết nối thử nghiệm tới OpenAI và Google Gemini với mẫu input code Java đơn giản.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🎤</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR1 (4-5 phút)</div>
+                            <span class="card-badge amber">Bảo vệ định hướng</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Danh sách Rule & Tiêu chí:</strong> Trình bày bảng danh mục rule dự kiến và các tiêu chí đánh giá độ chính xác (Precision, Recall).</li>
+                        <li class="task-item"><strong>Kết quả gọi AI ban đầu:</strong> Trình diễn phản hồi đầu tiên từ OpenAI/Gemini khi tiếp nhận mã lỗi sinh viên.</li>
+                        <li class="task-item"><strong>Định hướng duyệt AST:</strong> Nêu rõ cam kết không dùng regex thô mà sẽ phân tích dựa trên cấu trúc cây cú pháp.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                🎤 <strong>TV3 thuyết trình:</strong> "Mục tiêu của em không chỉ là báo lỗi máy móc, mà là dùng AI để chuyển đổi lỗi kỹ thuật thành bài học sư phạm trực quan cho sinh viên."
+            </div>
+        </div>
+
+        <!-- SLIDE 10: TV3 (TUẦN 4 - 6: PR2) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV3 - AI Rule & Detection Engineer (Trọng Tâm)</div>
+                <h2 class="slide-title">Tuần 4 - 6 (Peer-Review 2): Xây Dựng Rule Engine v1 & Test Case Ban Đầu</h2>
+                <p class="slide-subtitle">Triển khai các quy tắc phát hiện lỗi logic đầu tiên và đo lường tỉ lệ phát hiện</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8;">⚡</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">Rule Engine v1</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Xây dựng các rule đầu tiên:</strong> Phát hiện Null Return (`NPE`), Cấp phát mảng trong vòng lặp (`OOM`), Chuẩn đặt tên class (`CS`).</li>
+                        <li class="task-item"><strong>Kiểm tra method quá dài:</strong> Phát hiện phương thức vượt quá 40 dòng lệnh (`LONG_METHOD`) và thiếu chú thích (`COMMENT`).</li>
+                        <li class="task-item"><strong>Viết bộ test case ban đầu:</strong> Viết các ca kiểm thử mẫu để đối chiếu khả năng phát hiện lỗi.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🖥️</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR2 (Demo Lớn)</div>
+                            <span class="card-badge amber">Live Demo</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Demo Rule Engine v1:</strong> Chạy phân tích trực tiếp trên 1 file mã nguồn nộp thử nghiệm và in ra danh sách vi phạm kèm số dòng.</li>
+                        <li class="task-item"><strong>Báo cáo False Positive ban đầu:</strong> Phân tích các hạn chế khi còn phụ thuộc vào text matcher và định hướng chuyển đổi sang AST Visitor.</li>
+                        <li class="task-item"><strong>Phối hợp cùng TV1 & TV2:</strong> Minh họa luồng dữ liệu lỗi được đẩy vào bảng RuleViolation.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">📈 Số rule ban đầu:</span>
+                <span class="metric-val">6 Rule cơ bản đã phát hiện thành công trong PR2</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 11: TV3 (TUẦN 7 - 9: PR3) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV3 - AI Rule & Detection Engineer (Đột Phá Kỹ Thuật)</div>
+                <h2 class="slide-title">Tuần 7 - 9 (Peer-Review 3): Đột Phá 15 Visitor AST & Tích Hợp AI Nâng Cao</h2>
+                <p class="slide-subtitle">Chuyển đổi 100% sang JavaParser Visitor, tích hợp AIService thuần Java và Prompt Engineering</p>
+            </div>
+
+            <div class="grid-3">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">1</div>
+                        <div>
+                            <div class="card-title">15 Visitor AST Độc Lập</div>
+                            <span class="card-badge cyan">JavaParser</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Vòng lặp vô hạn (INF_LOOP):</strong> Bắt while(true), counter ngược chiều (i--), biến bất biến.</li>
+                        <li class="task-item"><strong>Lỗi logic & Sập app:</strong> So sánh chuỗi bằng == (STR_EQ), Chia cho 0 (DIV_ZERO), Gán trong if.</li>
+                        <li class="task-item"><strong>Rò rỉ tài nguyên:</strong> Quên đóng JDBC Connection (RES_LEAK), Nuốt lỗi catch rỗng.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">2</div>
+                        <div>
+                            <div class="card-title">AIService Thuần Java</div>
+                            <span class="card-badge amber">OpenAI & Gemini</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Pure HttpURLConnection:</strong> Kết nối bảo mật HTTPS không phụ thuộc thư viện ngoài.</li>
+                        <li class="task-item"><strong>Dự phòng 3 lớp:</strong> Giấu key trong .env; Timeout 15s; Tự động kích hoạt Local Explainer khi offline.</li>
+                        <li class="task-item"><strong>Không bao giờ crash:</strong> Luôn đảm bảo sinh phản hồi Markdown sư phạm.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">3</div>
+                        <div>
+                            <div class="card-title">Prompt Engineering</div>
+                            <span class="card-badge green">Tối ưu PR3</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Context Slicing:</strong> Chỉ trích xuất 5 dòng quanh lỗi, tiết kiệm 85% token, phản hồi dưới 1.5s.</li>
+                        <li class="task-item"><strong>Anti-Hallucination:</strong> Ép AI chỉ bám sát AST, triệt tiêu 100% lỗi bịa đặt.</li>
+                        <li class="task-item"><strong>Markdown sư phạm:</strong> Phân tích Nguyên nhân + Rủi ro + Code mẫu Before/After.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                🎤 <strong>TV3 thuyết trình PR3:</strong> "Em đã khắc phục hoàn toàn điểm yếu trước đây bằng cách đưa module AI về Java thuần và nâng cấp bộ nhận diện lên 15 AST Visitor đạt độ chính xác 100%."
+            </div>
+        </div>
+
+        <!-- SLIDE 12: TV3 (TUẦN 10: FINAL DEMO) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV3 - AI Rule & Detection Engineer (Bảo Vệ Chung Cuộc)</div>
+                <h2 class="slide-title">Tuần 10 (Final Demo): Báo Cáo 0% False Positive & Live Demo Lỗi Mẫu</h2>
+                <p class="slide-subtitle">Trình diễn trực tiếp bộ 4 kịch bản lỗi mẫu và bảo vệ trọn vẹn barem điểm AI Integration</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">📊</div>
+                        <div>
+                            <div class="card-title">Bộ Số Liệu Kiểm Thử Toàn Diện</div>
+                            <span class="card-badge green">100% Verified</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>15/15 Rule Test Pass:</strong> Tỉ lệ phát hiện lỗi đúng (Recall / True Positive Rate) đạt <strong>100.0%</strong>.</li>
+                        <li class="task-item"><strong>5/5 Clean Benchmarks:</strong> Tỉ lệ báo nhầm trên mã nguồn sạch (False Positive Rate) đạt <strong>0.00%</strong>.</li>
+                        <li class="task-item"><strong>Độ chính xác (Precision):</strong> Đạt <strong>100.0%</strong>, thời gian phân tích trung bình <strong>60 - 80ms</strong>.</li>
+                    </ul>
+                    <div class="metric-box">
+                        <span class="metric-label">⭐ Kết quả Benchmark:</span>
+                        <span class="metric-val">15 Rules Active | FPR: 0.00% | Speed: &lt;100ms</span>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🎬</div>
+                        <div>
+                            <div class="card-title">Kịch Bản Live Demo 4 Phút</div>
+                            <span class="card-badge amber">Trình diễn trực tiếp</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Sample 01 (Vô hạn):</strong> Demo phát hiện vòng lặp while(true), bước nhảy i-- ngược chiều $\rightarrow$ Trừ 10đ.</li>
+                        <li class="task-item"><strong>Sample 02 (Logic):</strong> Demo so sánh chuỗi '==', chia cho 0, gán nhầm trong if, catch rỗng.</li>
+                        <li class="task-item"><strong>Sample 04 (Code sạch):</strong> Demo bài nộp sinh viên xuất sắc đạt trọn vẹn <strong>10.0 / 10.0 điểm</strong>.</li>
+                        <li class="task-item"><strong>AI Phản hồi tức thì:</strong> Hiển thị báo cáo Markdown tiếng Việt giải thích sư phạm.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                🛡️ <strong>Sẵn sàng Q&A:</strong> TV3 tự tin bảo vệ: (1) Cơ chế duyệt node AST; (2) Luồng Prompt Context Slicing; (3) Luồng dữ liệu qua Docker Sandbox không cần mạng.
+            </div>
+        </div>
+
+        <!-- SLIDE 13: TV4 (TUẦN 1 - 3: PR1) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV4 - Web / MVC2 Frontend Engineer</div>
+                <h2 class="slide-title">Tuần 1 - 3 (Peer-Review 1): UI/UX Prototype, Use-Case & User Flow</h2>
+                <p class="slide-subtitle">Khởi tạo thiết kế giao diện tương tác cho Giảng viên và Sinh viên theo chuẩn MVC2</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🎨</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">UI Prototype</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Wireframe Submission Portal:</strong> Thiết kế giao diện nộp bài cho sinh viên và bảng quản lý lớp cho giảng viên.</li>
+                        <li class="task-item"><strong>Use-case Diagram hoàn chỉnh:</strong> Xác định rõ các Actor: Sinh viên (Nộp bài, Xem điểm, Xem gợi ý sửa), Giảng viên (Quản lý bài nộp, Cấu hình rule, Chấm phúc khảo), Hệ thống AI.</li>
+                        <li class="task-item"><strong>User Flow điều hướng:</strong> Vẽ luồng người dùng từ màn hình Login $\rightarrow$ Portal $\rightarrow$ Kết quả.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🎤</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR1 (4-5 phút)</div>
+                            <span class="card-badge amber">Bảo vệ UI/UX</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Trình bày Wireframe & Luồng đi:</strong> Minh họa trải nghiệm người dùng mượt mà khi nộp bài code.</li>
+                        <li class="task-item"><strong>Giải thích Use-case Diagram:</strong> Chứng minh tính bao quát của các chức năng trong môn PRJ301.</li>
+                        <li class="task-item"><strong>Tiếp thu phản hồi:</strong> Ghi nhận góp ý của nhóm bạn để chuẩn bị cho giai đoạn code Servlet/JSP.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">📌 Điểm nhấn Rubric:</span>
+                <span class="metric-val">Đạt trọn vẹn 10 điểm UI/UX Prototype & Use-case Diagram</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 14: TV4 (TUẦN 4 - 6: PR2) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV4 - Web / MVC2 Frontend Engineer</div>
+                <h2 class="slide-title">Tuần 4 - 6 (Peer-Review 2): Hoàn Thiện Submission Portal Servlet/JSP</h2>
+                <p class="slide-subtitle">Triển khai kiến trúc MVC2 thuần Java Web với Servlet, JSP, Filter và JSTL/EL</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">💻</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">MVC2 Core Web</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Tầng Servlet điều phối:</strong> Xây dựng HomeController, LoginController, LogoutController, SubmissionController, ScoreController.</li>
+                        <li class="task-item"><strong>Tầng Filter bảo mật:</strong> Triển khai Filter kiểm tra session đăng nhập và ngăn chặn truy cập trái phép.</li>
+                        <li class="task-item"><strong>Giao diện JSP & EL:</strong> Sử dụng Expression Language (EL) và JSTL hiển thị danh sách bài nộp và bảng điểm.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🖥️</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR2 (Demo Lớn)</div>
+                            <span class="card-badge amber">Live Demo MVC2</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Demo Live nộp bài:</strong> Sinh viên đăng nhập, chọn file Java/ZIP nộp lên hệ thống, lưu thành công vào CSDL.</li>
+                        <li class="task-item"><strong>Chứng minh cơ chế Filter:</strong> Thử truy cập thẳng URL không qua login và chứng minh Filter chặn lại.</li>
+                        <li class="task-item"><strong>Bảo vệ kiến trúc MVC2:</strong> Giải thích rõ phân tách Model (TV2), Controller (Servlet), View (JSP).</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                💬 <strong>Tuân thủ Rubric:</strong> Đóng góp then chốt vào tiêu chí 40% MVC2 / Clean Code trong barem chấm thi.
+            </div>
+        </div>
+
+        <!-- SLIDE 15: TV4 (TUẦN 7 - 9: PR3 & TUẦN 10: FINAL DEMO) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV4 - Web / MVC2 Frontend Engineer</div>
+                <h2 class="slide-title">Tuần 7 - 9 (PR3) & Tuần 10: Dashboard Hiển Thị AST & Demo Trực Quan</h2>
+                <p class="slide-subtitle">Trực quan hóa kết quả phân tích AST, diễn giải AI sư phạm và điều khiển luồng bảo vệ</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📊</div>
+                        <div>
+                            <div class="card-title">Tuần 7 - 9 (Peer-Review 3)</div>
+                            <span class="card-badge cyan">AST Dashboard</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>AST Result Dashboard:</strong> Hiển thị trực quan danh sách lỗi, số dòng vi phạm, mức độ nghiêm trọng và điểm trừ tương ứng.</li>
+                        <li class="task-item"><strong>Trình bày AI Feedback:</strong> Render lời giải thích Markdown và code mẫu sửa lỗi từ AIService (TV3).</li>
+                        <li class="task-item"><strong>Kiểm thử đa luồng:</strong> Thử nghiệm giao diện hoạt động ổn định trên nhiều trình duyệt và kích thước màn hình.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">🏆</div>
+                        <div>
+                            <div class="card-title">Tuần 10 (Final Demo)</div>
+                            <span class="card-badge green">Bảo vệ chung cuộc</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Chuẩn bị luồng demo mượt mà:</strong> Thiết lập sẵn tài khoản Sinh viên và Giảng viên để demo 2 chiều.</li>
+                        <li class="task-item"><strong>Trình diễn toàn diện:</strong> Nộp bài $\rightarrow$ Chờ xử lý $\rightarrow$ Xem bảng phân tích AST $\rightarrow$ Xem phản hồi AI.</li>
+                        <li class="task-item"><strong>Trả lời Q&A:</strong> Bảo vệ trải nghiệm người dùng, khả năng mở rộng giao diện và thiết kế MVC2.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">🎯 Trải nghiệm người dùng:</span>
+                <span class="metric-val">Thời gian phản hồi UI: &lt; 0.5 giây sau khi AST hoàn tất</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 16: TV5 (TUẦN 1 - 3: PR1) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV5 - Integration & QA/DevOps Engineer</div>
+                <h2 class="slide-title">Tuần 1 - 3 (Peer-Review 1): Khởi Tạo Hạ Tầng, CI & Thiết Kế Sandbox</h2>
+                <p class="slide-subtitle">Thiết lập kho mã nguồn chung, quy chuẩn làm việc Git và kiến trúc Docker Sandbox</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">📦</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">DevOps & Khởi tạo</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Khởi tạo Repo & Môi trường:</strong> Thiết lập repository GitHub, cấu hình .gitignore, phân nhánh chuẩn.</li>
+                        <li class="task-item"><strong>Quy tắc làm việc nhóm:</strong> Đưa ra quy ước commit, Pull Request và cơ chế kiểm thử CI cơ bản.</li>
+                        <li class="task-item"><strong>Kế hoạch Docker Sandbox:</strong> Nghiên cứu giải pháp cô lập môi trường thực thi và giới hạn tài nguyên (Resource Limits).</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🎤</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR1 (4-5 phút)</div>
+                            <span class="card-badge amber">Bảo vệ hạ tầng</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Cấu trúc Repo & Quy chuẩn:</strong> Trình bày cách tổ chức thư mục dự án và quy trình làm việc 5 thành viên.</li>
+                        <li class="task-item"><strong>Kế hoạch Sandbox & An ninh:</strong> Trình bày phương án bảo vệ máy chủ trước các nguy cơ tấn công từ code nộp.</li>
+                        <li class="task-item"><strong>Định hình barem Sandbox:</strong> Nhắc nhở toàn đội về tiêu chí 30% Sandbox Compliance.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                💬 <strong>Điểm mấu chốt:</strong> TV5 đặt nền móng an toàn bảo mật và kiểm soát chất lượng kỹ thuật xuyên suốt 10 tuần.
+            </div>
+        </div>
+
+        <!-- SLIDE 17: TV5 (TUẦN 4 - 6: PR2) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV5 - Integration & QA/DevOps Engineer</div>
+                <h2 class="slide-title">Tuần 4 - 6 (Peer-Review 2): Nén ZIP An Toàn & Xác Thực SHA-256</h2>
+                <p class="slide-subtitle">Triển khai xác thực toàn vẹn mã nguồn ngay tại tầng Filter trước khi nạp vào CSDL</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🔒</div>
+                        <div>
+                            <div class="card-title">Phần Việc Đã Làm (Tasks Done)</div>
+                            <span class="card-badge cyan">Xác thực toàn vẹn</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Kiểm tra an toàn ZIP:</strong> Thuật toán chặn đứng các lỗ hổng Zip-Slip (ghi đè file hệ thống) và Zip-Bomb (giải nén tràn đĩa).</li>
+                        <li class="task-item"><strong>Băm mật mã SHA-256:</strong> Tính toán mã băm SHA-256 từ luồng byte nộp bài, lưu vết vào cột file_hash.</li>
+                        <li class="task-item"><strong>Chống nộp trùng (Deduplication):</strong> Kiểm tra hash trong CSDL để từ chối các bài nộp trùng lặp, tiết kiệm tài nguyên chấm.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon amber">🖥️</div>
+                        <div>
+                            <div class="card-title">Nội Dung Thuyết Trình PR2 (Demo Lớn)</div>
+                            <span class="card-badge amber">Demo Bảo mật</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Demo luồng Nén ZIP + SHA-256:</strong> Nộp file ZIP và hiển thị chuỗi băm 64 ký tự hex được sinh tức thì.</li>
+                        <li class="task-item"><strong>Demo chống nộp trùng:</strong> Nộp lại cùng một file và chứng minh hệ thống phát hiện mã hash trùng khớp.</li>
+                        <li class="task-item"><strong>Bảo vệ tiêu chí an toàn:</strong> Giải thích vì sao việc xác thực hash ở Filter bảo vệ hệ thống trước hàng đợi AI.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="metric-box">
+                <span class="metric-label">🛡️ Thuật toán băm:</span>
+                <span class="metric-val">SHA-256 Digest | Ngăn chặn 100% tệp tin nộp trùng lặp</span>
+            </div>
+        </div>
+
+        <!-- SLIDE 18: TV5 (TUẦN 7 - 9: PR3 & TUẦN 10: FINAL DEMO) -->
+        <div class="slide">
+            <div class="slide-header">
+                <div class="slide-tag">TV5 - Integration & QA/DevOps Engineer</div>
+                <h2 class="slide-title">Tuần 7 - 9 (PR3) & Tuần 10: Docker Sandbox Cô Lập, Hàng Đợi & Báo Cáo</h2>
+                <p class="slide-subtitle">Cách ly tuyệt đối, xử lý chịu tải hàng đợi và tổng hợp báo cáo bảo vệ cuối khóa</p>
+            </div>
+
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon">🐳</div>
+                        <div>
+                            <div class="card-title">Tuần 7 - 9 (Peer-Review 3)</div>
+                            <span class="card-badge cyan">Sandbox & Queue</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Docker Sandbox cô lập:</strong> Cấu hình giới hạn khắt khe: CPU 50%, RAM 512MB, timeout 10s, đặc biệt --network=none.</li>
+                        <li class="task-item"><strong>Grading Queue (Redis):</strong> Cơ chế hàng đợi ưu tiên (Priority) và thử lại khi lỗi (Retry Mechanism).</li>
+                        <li class="task-item"><strong>Demo PR3:</strong> Mô phỏng sinh viên nộp code độc hại (vô hạn, chiếm RAM) và chứng minh Sandbox dập tắt an toàn.</li>
+                    </ul>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-icon green">🏆</div>
+                        <div>
+                            <div class="card-title">Tuần 10 (Final Demo)</div>
+                            <span class="card-badge green">Bảo vệ chung cuộc</span>
+                        </div>
+                    </div>
+                    <ul class="task-list">
+                        <li class="task-item"><strong>Hoàn thiện Final Report:</strong> Tổng hợp toàn bộ số liệu kỹ thuật, kiến trúc và kết quả nghiên cứu RBL.</li>
+                        <li class="task-item"><strong>Kịch bản ứng phó sự cố:</strong> Chuẩn bị phương án dự phòng khi chạy demo trực tiếp trước Hội đồng.</li>
+                        <li class="task-item"><strong>Chủ trì Sandbox Defense:</strong> Giúp nhóm đạt điểm tuyệt đối 30% Sandbox Compliance.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="speaker-box">
+                🎤 <strong>TV5 khẳng định:</strong> "Hệ thống AITA đảm bảo mã nguồn sinh viên được kiểm soát trong môi trường Sandbox an toàn tuyệt đối trước khi chuyển giao kết quả."
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer Controls -->
+    <footer>
+        <div class="nav-buttons">
+            <button class="btn" id="prevBtn" onclick="prevSlide()">◀ Trước</button>
+            <button class="btn primary" id="nextBtn" onclick="nextSlide()">Tiếp Theo ▶</button>
+        </div>
+        <div style="font-size: 13px; color: var(--text-muted);">
+            Sử dụng phím mũi tên <strong>&larr;</strong> hoặc <strong>&rarr;</strong> trên bàn phím để chuyển slide
+        </div>
+    </footer>
+
+    <script>
+        const slides = document.querySelectorAll('.slide');
+        let currentSlide = 0;
+        const totalSlides = slides.length;
+
+        function updateSlide() {
+            slides.forEach((slide, index) => {
+                slide.classList.remove('active');
+                if (index === currentSlide) {
+                    slide.classList.add('active');
+                }
+            });
+
+            document.getElementById('slideIndicator').innerText = `Slide ${currentSlide + 1} / ${totalSlides}`;
+            const progress = ((currentSlide + 1) / totalSlides) * 100;
+            document.getElementById('progressBar').style.width = `${progress}%`;
+
+            document.getElementById('prevBtn').disabled = (currentSlide === 0);
+            if (currentSlide === totalSlides - 1) {
+                document.getElementById('nextBtn').innerText = "Hoàn Tất ✔";
+            } else {
+                document.getElementById('nextBtn').innerText = "Tiếp Theo ▶";
+            }
+        }
+
+        function nextSlide() {
+            if (currentSlide < totalSlides - 1) {
+                currentSlide++;
+                updateSlide();
+            }
+        }
+
+        function prevSlide() {
+            if (currentSlide > 0) {
+                currentSlide--;
+                updateSlide();
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowRight' || e.key === 'Space') {
+                nextSlide();
+            } else if (e.key === 'ArrowLeft') {
+                prevSlide();
+            }
+        });
+
+        updateSlide();
+    </script>
+</body>
+</html>

@@ -3,13 +3,15 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_4_0.xsd"
          version="4.0">
+    <display-name>PRJ301_AITA_DB</display-name>
+
+    <welcome-file-list>
+        <welcome-file>home</welcome-file>
+    </welcome-file-list>
+
     <filter>
         <filter-name>authFilter</filter-name>
         <filter-class>com.group1.filter.AuthFilter</filter-class>
-    </filter>
-    <filter>
-        <filter-name>sha256Filter</filter-name>
-        <filter-class>com.group1.filter.Sha256Filter</filter-class>
     </filter>
     <filter-mapping>
         <filter-name>authFilter</filter-name>
@@ -29,8 +31,25 @@
     </filter-mapping>
     <filter-mapping>
         <filter-name>authFilter</filter-name>
+        <url-pattern>/score</url-pattern>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>authFilter</filter-name>
+        <url-pattern>/submission</url-pattern>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>authFilter</filter-name>
         <url-pattern>/student/submissions</url-pattern>
     </filter-mapping>
+    <filter-mapping>
+        <filter-name>authFilter</filter-name>
+        <url-pattern>/api/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>sha256Filter</filter-name>
+        <filter-class>com.group1.filter.Sha256Filter</filter-class>
+    </filter>
     <filter-mapping>
         <filter-name>sha256Filter</filter-name>
         <url-pattern>/student/submissions</url-pattern>

@@ -290,6 +290,8 @@ Nhóm cam kết tuân thủ các nguyên tắc kỷ luật học thuật sau đ�
 * **Containerization:** Docker Desktop.
 * **IDE:** IntelliJ IDEA / Eclipse / VS Code kèm Java Extension Pack.
 
+Hướng dẫn build image và chạy Java Sandbox trên Docker Desktop (Windows): [portal-node/README.md — Sandbox](portal-node/README.md#sandbox).
+
 ### 8.2. Cấu trúc Dự án Hiện tại
 ```text
 PRJ301---Group1/
@@ -327,13 +329,25 @@ PRJ301---Group1/
 │   │       ├── ResourceLeakVisitor.java
 │   │       └── ... (các visitor khác)
 │   ├── service/                  # Dịch vụ tích hợp AI (TV3)
-│   │   └── AIService.java        # Client OpenAI / Gemini & Local Pedagogical Explainer
+│   │   └── AIService.java        # Client OpenAI / Gemini & Local Pedagogical Explainer (Context Slicing)
 │   ├── util/                     # Hỗ trợ đọc CSV, băm SHA-256, DBConnection, JWT
 │   ├── DataGenerator.java        # Tiện ích sinh dữ liệu mẫu
 │   └── Main.java                 # Chương trình kiểm tra kết nối & nạp DB
 ├── src/main/webapp/WEB-INF/views/ # JSP EL/JSTL cho đăng nhập, trang chủ, Submission Portal và dashboard AST
+├── src/test/java/com/group1/     # Thư mục kiểm thử tự động JUnit 4 (50 Unit Tests)
+│   ├── ast/                      # 21 Unit Test AST Core (TV1)
+│   │   └── AstEngineTest.java
+│   ├── rule/                     # 29 Unit Test 15 Rules & False Positive (TV3)
+│   │   ├── IndividualRuleJUnitTest.java           # 15 Test case kiểm thử riêng từng rule (100% Recall)
+│   │   ├── FalsePositiveBenchmarkJUnitTest.java   # 11 Test case đo lường 0% False Positive Rate
+│   │   └── AIServicePromptJUnitTest.java          # 3 Test case xác minh Prompt Context Slicing
+│   └── controller/               # Test tích hợp Servlet E2E (TV5)
+│       └── SubmissionServletE2ETest.java
+├── docs/
+│   ├── FINAL_REPORT_TV5.md      # Báo cáo kỹ thuật cuối kỳ và QA/DevOps (TV5)
+│   └── FALSE_POSITIVE_REPORT.md # Báo cáo kỹ thuật chi tiết đo lường False Positive (TV3)
 ├── portal-node/                  # Cổng nộp bài Web Portal (Node/Express)
-├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, ...)
+├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, junit...)
 └── README.md                     # Tài liệu kiến trúc dự án & timeline
 ```
 
@@ -344,7 +358,7 @@ PRJ301---Group1/
    cd PRJ301---Group1
    ```
 2. **Kiểm tra dịch vụ SQL Server:** Đảm bảo SQL Server đang chạy và cổng `1433` (TCP/IP) đã được kích hoạt (có thể chạy file [fix_sql.ps1](file:///c:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1/fix_sql.ps1) bằng quyền Administrator nếu gặp sự cố cổng TCP).
-3. **Cấu hình chuỗi kết nối:** Mở tệp [Main.java](file:///c:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1/src/main/java/com/group1/Main.java) và cập nhật tài khoản kết nối CSDL (mặc định: `sa` / mật khẩu quản trị).
+3. **Cấu hình kết nối:** Đặt `DB_URL`, `DB_USER`, `DB_PASSWORD` cho SQL Server và `JWT_SECRET` (ít nhất 32 ký tự) trong môi trường chạy ứng dụng. Không lưu mật khẩu hoặc JWT secret trong mã nguồn.
 4. **Biên dịch và chạy thử:**
    - **Cách 1: Sử dụng Java trực tiếp (đã có sẵn `mssql-jdbc.jar` trong repo):**
      ```powershell
@@ -376,7 +390,7 @@ Wireframe, use-case, luồng sinh viên/giảng viên, ma trận kiểm thử đ
 
 **Chuẩn bị trước buổi demo**
 
-1. Chạy SQL Server, cấu hình `DB_URL`, `DB_USER`, `DB_PASSWORD`, triển khai WAR lên Servlet 4.0 container. Mở `/login` nếu WAR chạy ở root context; nếu container dùng tên WAR làm context (ví dụ Tomcat với `PRJ301_AITA_DB-1.0-SNAPSHOT-webapp.war`), thêm prefix `/PRJ301_AITA_DB-1.0-SNAPSHOT-webapp` trước các route, ví dụ `/PRJ301_AITA_DB-1.0-SNAPSHOT-webapp/login`.
+1. Chạy SQL Server, cấu hình `DB_URL`, `DB_USER`, `DB_PASSWORD` và `JWT_SECRET` (ít nhất 32 ký tự) trong môi trường chạy ứng dụng, sau đó triển khai WAR lên Servlet 4.0 container. Mở `/login` nếu WAR chạy ở root context; nếu container dùng tên WAR làm context (ví dụ Tomcat với `PRJ301_AITA_DB-1.0-SNAPSHOT-webapp.war`), thêm prefix `/PRJ301_AITA_DB-1.0-SNAPSHOT-webapp` trước các route, ví dụ `/PRJ301_AITA_DB-1.0-SNAPSHOT-webapp/login`.
 2. Cần có dữ liệu mẫu liên kết đủ `Users` → `Submission` → `AnalysisResult` → `RuleViolation` → `RuleDefinition`. Nếu cần nạp CSV, chỉ chạy `DatabaseSeeder` trên database demo dùng riêng: seeder sẽ xóa và tạo lại các bảng AITA trước khi import.
 3. Với dữ liệu CSV hiện tại, dùng sinh viên `dungvo658` (HE039, có bài phân tích mẫu SUB0001) và giảng viên `sondang619` (GV0001); mật khẩu demo khớp giá trị `password_hash` trong `data/users.csv` (`hash_dungvo658` và `hash_sondang619`). Đây chỉ là tài khoản mẫu, không dùng trong môi trường thật.
 4. Mở hai browser profile riêng hoặc cửa sổ riêng tư để giữ session của giảng viên và sinh viên độc lập. Chuẩn bị một ZIP nhỏ có mã nguồn; dùng ZIP mới cho mỗi lần chạy vì bài nộp trùng SHA-256 sẽ bị từ chối.
@@ -404,6 +418,23 @@ mvn --batch-mode test
 ```
 
 `SubmissionServletE2ETest` kiểm tra luồng nộp multipart, quyền sinh viên, CSRF, SHA-256 và chống nộp trùng. `AnalysisDashboardControllerTest` kiểm tra luồng sinh viên chỉ xem được bài của mình, giảng viên xem kết quả toàn hệ thống, người chưa đăng nhập và session không khớp bị chặn. `DashboardAccessTest` kiểm tra trang chủ cần đăng nhập và sinh viên không thể đọc toàn bộ điểm giảng viên. Các test dùng JDBC test double nên không cần SQL Server.
+
+### 8.7. Kiểm thử JUnit 4 cho AST Rules, False Positive và AI (TV3)
+TV3 đã chuẩn hóa kiểm thử sang **JUnit 4** và công bố số liệu kiểm thử thực nghiệm:
+* Báo cáo kỹ thuật chi tiết: 👉 [docs/FALSE_POSITIVE_REPORT.md](docs/FALSE_POSITIVE_REPORT.md)
+* **Kết quả đo lường thực nghiệm:**
+  * **Tỉ lệ Báo nhầm (False Positive Rate):** **0.00%** (0 / 10 clean code benchmarks)
+  * **Độ nhạy / Tỉ lệ phát hiện đúng (Recall):** **100.0%** (15 / 15 rule violations)
+  * **Độ chính xác (Precision):** **100.0%** (F1-Score: **1.00**)
+  * **Prompt Engineering:** Áp dụng **Context Slicing** (chỉ trích xuất 5 dòng quanh vị trí lỗi với marker `>>`; không gửi raw source code).
+
+**Cách chạy các kiểm thử JUnit 4 của TV3 trực tiếp từ dòng lệnh:**
+```powershell
+# Chạy bộ kiểm thử AST Rules, False Positive và Prompt Slicing:
+java -cp "target/test-classes;target/classes;target/PRJ301_AITA_DB-1.0-SNAPSHOT.jar;C:\Program Files\NetBeans-17\netbeans\platform\modules\ext\junit-4.13.2.jar;C:\Program Files\NetBeans-17\netbeans\platform\modules\ext\hamcrest-core-1.3.jar" org.junit.runner.JUnitCore com.group1.rule.IndividualRuleJUnitTest com.group1.rule.FalsePositiveBenchmarkJUnitTest com.group1.rule.AIServicePromptJUnitTest
+```
+
+**Kết quả thực thi JUnit 4:** xác nhận bằng kết quả test của TV3 tại [docs/FALSE_POSITIVE_REPORT.md](docs/FALSE_POSITIVE_REPORT.md).
 
 ---
 *Bản quyền tài liệu thuộc về **Nhóm 1 – PRJ301 (AITA Project)** | Lưu trữ tại GitHub: [rtafag/PRJ301---Group1](https://github.com/rtafag/PRJ301---Group1). Được cập nhật và hoàn thiện theo Đề cương chi tiết 10 tuần và Rubric Đánh giá Học thuật.*

@@ -17,7 +17,7 @@ Copy-Item .env.example .env
 npm.cmd start
 ```
 
-Open `http://localhost:3000`. User IDs run from `GV0001` for teachers and `HE001` for students. Usernames use each roster email's local part, and demo passwords use `hash_<username>`; duplicate email local parts include the lower-case user ID as a suffix. These are sample credentials, not production password hashes.
+Open `http://localhost:3000`. User IDs run from `GV0001` for teachers and `HE001` for students. Usernames use each roster email's local part, and seeded demo accounts use `password123`; duplicate email local parts include the lower-case user ID as a suffix. These are sample credentials, not production passwords.
 
 ## Password recovery
 
@@ -94,7 +94,61 @@ WITH (
 
 ## Sandbox
 
-Set `SANDBOX_ENABLED=true` and provide a pre-pulled Java image in `SANDBOX_IMAGE`. The runner uses no network, a read-only source mount, a non-root user, CPU/memory/process limits, and a short timeout. The server reports the sandbox as unavailable when Docker is missing.
+The sandbox is disabled by default. To run it locally on Windows with Docker Desktop:
+
+1. Start Docker Desktop and make sure it uses **Linux containers**. In PowerShell, confirm the daemon is ready:
+
+   ```powershell
+   docker info
+   ```
+
+2. From the `portal-node` directory, build the local Java runtime image:
+
+   ```powershell
+   docker build -t aita-java-sandbox:8 -f sandbox\Dockerfile sandbox
+   docker image inspect aita-java-sandbox:8
+   ```
+
+   The runner uses `--pull=never`, so it will not download an image during a student request.
+
+3. Start Redis if it is not already running:
+
+   ```powershell
+   docker run -d --name aita-redis -p 6379:6379 redis:7-alpine
+   ```
+
+   If the `aita-redis` container already exists but is stopped, run `docker start aita-redis` instead.
+
+4. Install Node.js 22 or newer. Copy `.env.example` to `.env` if needed, then set:
+
+   ```env
+   REDIS_URL=redis://127.0.0.1:6379
+   SANDBOX_ENABLED=true
+   SANDBOX_IMAGE=aita-java-sandbox:8
+   ```
+
+5. In PowerShell, start the portal:
+
+   ```powershell
+   npm.cmd install
+   npm.cmd start
+   ```
+
+6. Open `http://localhost:3000`, sign in as a demo student, submit a `.java` file with a `main` method, and open **Analysis & fixes**. Select **Run in sandbox**. The output appears below the button. The API endpoint is `POST /api/student/submissions/:submissionId/run`; it only runs a Java source file owned by the authenticated student.
+
+The runner executes each program in a fresh container with no network, a read-only source mount, a non-root user, dropped Linux capabilities, `no-new-privileges`, 128 MiB memory, 0.5 CPU, 32 processes, a 12-second timeout, and bounded output. The named container is explicitly killed if it exceeds the timeout. The submitted source is removed from the server's temporary directory after the run. Do not expose this demo portal directly to the public internet.
+
+If PowerShell says the Docker engine cannot be reached, start Docker Desktop and wait for `docker info` to complete successfully. If the image is missing, rebuild it with the command in step 2. To stop the optional Redis container after the demo:
+
+```powershell
+docker rm -f aita-redis
+```
+
+Sandbox unit tests use a mocked Docker process and run without a Docker daemon:
+
+```powershell
+npm.cmd test
+```
 
 ## API
 

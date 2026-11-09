@@ -53,7 +53,7 @@ Dashboard hiển thị mã submission, thời gian phân tích, feedback, tên/m
 
 Kiểm chứng trong môi trường phát triển:
 
-- Java 25: `mvn --batch-mode clean package` thành công; **39 test đạt, 0 lỗi**.
+- Java 25: `mvn --batch-mode clean package` thành công; **69 test đạt, 0 lỗi** (40 test portal/dashboard và 29 test AST/AI).
 - HTTP E2E chạy trên Jetty test container: xác nhận CSRF GET/POST, từ chối người chưa đăng nhập và role sai, SHA-256, ZIP không hợp lệ, chống nộp trùng.
 - Controller tests kiểm tra session mismatch, role student/teacher/admin, scope kết quả, lỗi khởi tạo schema và quyền bảng điểm.
 - WAR chứa JSP đăng nhập/trang chủ/portal/dashboard, AuthFilter, Sha256Filter và JSTL.
@@ -64,7 +64,7 @@ Kiểm chứng trong môi trường phát triển:
 
 1. Servlet upload tạo submission trạng thái `Submitted`, nhưng chưa enqueue bài đó sang Redis/AST worker. Dashboard hiển thị các kết quả đã được phân tích và lưu trước đó; demo cần dữ liệu mẫu có liên kết đầy đủ.
 2. Chưa triển khai WAR trực tiếp lên Tomcat kết nối SQL Server trong phiên làm việc này; chưa có kiểm thử người dùng thật. Vì vậy không tuyên bố đã xác nhận runtime production hay thu thập phản hồi người dùng.
-3. Đăng nhập Java hiện dùng `HttpSession`; chuyển sang JWT là việc thuộc phần backend/auth của TV2, không phải thay đổi của TV4.
+3. Luồng đăng nhập phát hành JWT và đồng bộ với `HttpSession`; `AuthFilter` hỗ trợ token Bearer/cookie và session tương thích. Cần cấu hình `JWT_SECRET` (ít nhất 32 ký tự) qua môi trường chạy, không đặt secret trong mã nguồn.
 4. Ảnh Excel đính kèm xác định danh sách công việc, không phải mẫu thiết kế giao diện. Tài liệu wireframe trong repo là đặc tả thao tác, không giả định pixel-perfect từ ảnh đó.
 
 ## 7. Kịch bản demo đề xuất (5 phút)

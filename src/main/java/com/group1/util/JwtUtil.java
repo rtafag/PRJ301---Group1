@@ -11,7 +11,6 @@ import javax.crypto.spec.SecretKeySpec;
  * Uses HMAC-SHA256 (HS256) signature, interoperable with portal-node.
  */
 public class JwtUtil {
-    private static final String DEFAULT_SECRET = "aita-secret-key-prj301-group1-2026";
     private static final long EXPIRATION_TIME_MS = 8 * 60 * 60 * 1000L; // 8 hours
 
     public static class Claims {
@@ -22,6 +21,12 @@ public class JwtUtil {
         public String fullName;
         public long exp;
 
+        public String getUserId() { return userId; }
+        public String getUsername() { return username; }
+        public String getRole() { return role; }
+        public String getFullName() { return fullName; }
+        public long getExp() { return exp; }
+
         @Override
         public String toString() {
             return "Claims{userId='" + userId + "', username='" + username + "', role='" + role + "'}";
@@ -29,21 +34,33 @@ public class JwtUtil {
     }
 
     private static String getSecret() {
-        return System.getenv().getOrDefault("JWT_SECRET", DEFAULT_SECRET);
+        String secret = System.getenv("JWT_SECRET");
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException("Set JWT_SECRET to a value of at least 32 characters.");
+        }
+        return secret;
     }
 
     public static String generateToken(Users user) {
+        return generateToken(user.getUserId(), user.getUsername(), user.getRole(), user.getFullName());
+    }
+
+    public static String generateToken(String userId, String username, String role) {
+        return generateToken(userId, username, role, username);
+    }
+
+    public static String generateToken(String userId, String username, String role, String fullName) {
         long now = System.currentTimeMillis() / 1000;
         long exp = now + (EXPIRATION_TIME_MS / 1000);
 
         String headerJson = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
         String payloadJson = String.format(
                 "{\"sub\":\"%s\",\"userId\":\"%s\",\"username\":\"%s\",\"fullName\":\"%s\",\"role\":\"%s\",\"iat\":%d,\"exp\":%d}",
-                escape(user.userId),
-                escape(user.userId),
-                escape(user.username),
-                escape(user.fullName),
-                escape(user.role),
+                escape(userId),
+                escape(userId),
+                escape(username),
+                escape(fullName != null ? fullName : username),
+                escape(role),
                 now,
                 exp
         );
@@ -67,29 +84,40 @@ public class JwtUtil {
         return claims.exp > now;
     }
 
+    public static Claims getClaims(String token) {
+        return parseToken(token);
+    }
+
     public static Claims parseToken(String token) {
-        if (token == null) return null;
+        if (token == null || !token.contains(".")) {
+            return null;
+        }
         String[] parts = token.split("\\.");
-        if (parts.length != 3) return null;
+        if (parts.length != 3) {
+            return null;
+        }
 
         String data = parts[0] + "." + parts[1];
-        String expectedSig = sign(data, getSecret());
-        if (!expectedSig.equals(parts[2])) {
+        String expectedSignature = sign(data, getSecret());
+
+        if (!parts[2].equals(expectedSignature)) {
             return null; // Invalid signature
         }
 
         try {
-            byte[] payloadBytes = Base64.getUrlDecoder().decode(parts[1]);
-            String payloadJson = new String(payloadBytes, StandardCharsets.UTF_8);
+            Base64.Decoder decoder = Base64.getUrlDecoder();
+            String payloadJson = new String(decoder.decode(parts[1]), StandardCharsets.UTF_8);
 
             Claims claims = new Claims();
-            claims.sub = extractJsonField(payloadJson, "sub");
-            claims.userId = extractJsonField(payloadJson, "userId");
-            claims.username = extractJsonField(payloadJson, "username");
-            claims.role = extractJsonField(payloadJson, "role");
-            claims.fullName = extractJsonField(payloadJson, "fullName");
-            String expStr = extractJsonField(payloadJson, "exp");
+            claims.sub = extractField(payloadJson, "sub");
+            claims.userId = extractField(payloadJson, "userId");
+            claims.username = extractField(payloadJson, "username");
+            claims.role = extractField(payloadJson, "role");
+            claims.fullName = extractField(payloadJson, "fullName");
+
+            String expStr = extractNumericField(payloadJson, "exp");
             claims.exp = expStr != null ? Long.parseLong(expStr) : 0;
+
             return claims;
         } catch (Exception e) {
             return null;
@@ -108,36 +136,37 @@ public class JwtUtil {
         }
     }
 
-    private static String escape(String s) {
-        if (s == null) return "";
-        return s.replace("\\", "\\\\").replace("\"", "\\\"");
+    private static String escape(String val) {
+        if (val == null) return "";
+        return val.replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "\\r");
     }
 
-    private static String extractJsonField(String json, String field) {
-        String pattern = "\"" + field + "\":";
-        int index = json.indexOf(pattern);
-        if (index == -1) return null;
-        int start = index + pattern.length();
-        if (json.charAt(start) == '"') {
-            start++;
-            int end = json.indexOf('"', start);
-            return end != -1 ? json.substring(start, end) : null;
-        } else {
-            int end = start;
-            while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '-')) {
-                end++;
-            }
-            return json.substring(start, end);
+    private static String extractField(String json, String key) {
+        String marker = "\"" + key + "\":\"";
+        int idx = json.indexOf(marker);
+        if (idx == -1) return null;
+        int start = idx + marker.length();
+        int end = json.indexOf("\"", start);
+        return end != -1 ? json.substring(start, end) : null;
+    }
+
+    private static String extractNumericField(String json, String key) {
+        String marker = "\"" + key + "\":";
+        int idx = json.indexOf(marker);
+        if (idx == -1) return null;
+        int start = idx + marker.length();
+        int end = start;
+        while (end < json.length() && (Character.isDigit(json.charAt(end)) || json.charAt(end) == '-')) {
+            end++;
         }
+        return json.substring(start, end).trim();
     }
 
     public static void main(String[] args) {
-        Users u = new Users("HE001", "dungdang442", "hash_dungdang442", "Đặng Quang Dũng", "dung@gmail.com", "Student", "2023-10-01");
-        String token = generateToken(u);
+        Users dummy = new Users("HE001", "dungdang442", "dummyHash", "Đặng Quang Dũng", "dung@fpt.edu.vn", "Student", "2023-10-01");
+        String token = generateToken(dummy);
         System.out.println("Generated JWT: " + token);
-        boolean valid = validateToken(token);
-        System.out.println("Validated: " + valid);
-        Claims claims = parseToken(token);
-        System.out.println("Parsed Claims: " + claims);
+        System.out.println("Validated: " + validateToken(token));
+        System.out.println("Parsed Claims: " + parseToken(token));
     }
 }

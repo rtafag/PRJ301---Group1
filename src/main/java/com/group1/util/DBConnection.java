@@ -16,8 +16,16 @@ public final class DBConnection {
         } catch (ClassNotFoundException ignored) {
         }
         String url = System.getenv().getOrDefault("DB_URL", DEFAULT_URL);
-        String username = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "sa";
-        String password = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "password123";
+        String username = requiredEnvironmentVariable("DB_USER");
+        String password = requiredEnvironmentVariable("DB_PASSWORD");
         return DriverManager.getConnection(url, username, password);
+    }
+
+    private static String requiredEnvironmentVariable(String name) throws SQLException {
+        String value = System.getenv(name);
+        if (value == null || value.trim().isEmpty()) {
+            throw new SQLException("Set " + name + " before connecting to SQL Server.");
+        }
+        return value;
     }
 }
