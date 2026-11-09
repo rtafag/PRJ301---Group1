@@ -169,14 +169,35 @@ export async function createSqlRuntimeRepository() {
 
       // 2. Rules (RuleDefinition)
       if (Array.isArray(runtimeData.rules) && runtimeData.rules.length > 0) {
-        const rulesData = runtimeData.rules.map((r) => ({
-          ruleId: Number(r.ruleId),
-          ruleCode: r.ruleCode,
-          ruleName: r.ruleName,
-          severity: r.severity,
-          penaltyPoints: Number(r.penaltyPoints || 0),
-          description: r.description || ''
-        }));
+        const seenCodes = new Set();
+        const seenIds = new Set();
+        let maxId = 0;
+        for (const r of runtimeData.rules) {
+          const id = Number(r.ruleId);
+          if (!isNaN(id) && id > maxId) maxId = id;
+        }
+
+        const rulesData = [];
+        for (const r of runtimeData.rules) {
+          if (!r || !r.ruleCode || seenCodes.has(r.ruleCode)) continue;
+          seenCodes.add(r.ruleCode);
+
+          let id = Number(r.ruleId);
+          if (isNaN(id) || id <= 0 || seenIds.has(id)) {
+            maxId += 1;
+            id = maxId;
+          }
+          seenIds.add(id);
+
+          rulesData.push({
+            ruleId: id,
+            ruleCode: r.ruleCode,
+            ruleName: r.ruleName || r.ruleCode,
+            severity: r.severity || 'Medium',
+            penaltyPoints: Number(r.penaltyPoints || 0),
+            description: r.description || ''
+          });
+        }
 
         await pool.request()
           .input('rulesJson', sql.NVarChar(sql.MAX), JSON.stringify(rulesData))
@@ -193,7 +214,7 @@ export async function createSqlRuntimeRepository() {
                 description nvarchar(max) '$.description'
               )
             ) AS source
-            ON target.rule_id = source.rule_id
+            ON target.rule_code = source.rule_code
             WHEN MATCHED THEN
               UPDATE SET rule_code = source.rule_code, rule_name = source.rule_name, severity = source.severity, penalty_points = source.penalty_points, description = source.description
             WHEN NOT MATCHED THEN
