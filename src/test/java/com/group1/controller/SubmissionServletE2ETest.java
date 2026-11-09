@@ -129,6 +129,21 @@ public class SubmissionServletE2ETest {
     }
 
     @Test
+    public void submissionFilterRejectsNonZipBeforeServletAndAddsSha256ForValidZip() throws Exception {
+        String cookie = loginAndGetSessionCookie();
+
+        HttpResult rejected = upload(createZip(), cookie, "project.txt");
+        assertEquals(HttpServletResponse.SC_BAD_REQUEST, rejected.status);
+        assertEquals(0, submissionServlet.getPostInvocations());
+
+        HttpResult accepted = upload(createZip(), cookie, "project.zip");
+        assertEquals(HttpServletResponse.SC_CREATED, accepted.status);
+        assertEquals(1, submissionServlet.getPostInvocations());
+        assertTrue(accepted.body.contains("\"sha256\":\""
+                + hex(MessageDigest.getInstance("SHA-256").digest(createZip())) + "\""));
+    }
+
+    @Test
     public void analysisDashboardShowsAstFindingsAndSuggestionsToSubmissionOwner() throws Exception {
         String cookie = loginAndGetSessionCookie();
 
@@ -232,9 +247,14 @@ public class SubmissionServletE2ETest {
     }
 
     private HttpResult upload(byte[] zip, String cookie) throws IOException {
+        return upload(zip, cookie, "project.zip");
+    }
+
+    private HttpResult upload(byte[] zip, String cookie, String fileName) throws IOException {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         write(body, "--" + BOUNDARY + "\r\n");
-        write(body, "Content-Disposition: form-data; name=\"submissionFile\"; filename=\"project.zip\"\r\n");
+        write(body, "Content-Disposition: form-data; name=\"submissionFile\"; filename=\""
+                + fileName + "\"\r\n");
         write(body, "Content-Type: application/zip\r\n\r\n");
         body.write(zip);
         write(body, "\r\n--" + BOUNDARY + "--\r\n");

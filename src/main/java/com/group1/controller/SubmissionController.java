@@ -1,6 +1,7 @@
 package com.group1.controller;
 
 import com.group1.dao.SubmissionDAO;
+import com.group1.filter.SubmissionSecurityFilter;
 import com.group1.model.Submission;
 import com.group1.model.Users;
 import com.group1.util.DBConnection;
@@ -12,8 +13,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
@@ -127,7 +126,11 @@ public class SubmissionController extends HttpServlet {
             return;
         }
 
-        String fileHash = sha256(archiveBytes);
+        Object filteredHash = request.getAttribute(SubmissionSecurityFilter.SUBMISSION_SHA256_ATTRIBUTE);
+        if (!(filteredHash instanceof String) || ((String) filteredHash).trim().isEmpty()) {
+            throw new ServletException("Submission hash filter did not provide the upload SHA-256.");
+        }
+        String fileHash = (String) filteredHash;
         String submissionId = "SUB-" + UUID.randomUUID().toString();
         Path savedFile = null;
         try (Connection connection = openConnection()) {
@@ -216,19 +219,6 @@ public class SubmissionController extends HttpServlet {
             }
         }
         return false;
-    }
-
-    private static String sha256(byte[] bytes) throws ServletException {
-        try {
-            byte[] digest = MessageDigest.getInstance("SHA-256").digest(bytes);
-            StringBuilder hex = new StringBuilder(digest.length * 2);
-            for (byte value : digest) {
-                hex.append(String.format("%02x", value & 0xff));
-            }
-            return hex.toString();
-        } catch (NoSuchAlgorithmException exception) {
-            throw new ServletException("SHA-256 is not available on this server.", exception);
-        }
     }
 
     private static void removeSavedFile(Path file) throws ServletException {

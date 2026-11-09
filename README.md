@@ -330,8 +330,9 @@ PRJ301---Group1/
 │   ├── util/                     # Hỗ trợ đọc CSV, băm SHA-256, DBConnection, JWT
 │   ├── DataGenerator.java        # Tiện ích sinh dữ liệu mẫu
 │   └── Main.java                 # Chương trình kiểm tra kết nối & nạp DB
-├── portal-node/                  # Cổng nộp bài Web Portal (Node/Express)
-├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, ...)
+├── portal-node/                  # Prototype Node/Express độc lập, không phải UI MVC2 chính
+├── docs/TV4_WIREFRAME_USE_CASE.md # Wireframe và Use-case cho giao diện Servlet/JSP
+├── pom.xml                       # Maven WAR cho web app Servlet/JSP
 └── README.md                     # Tài liệu kiến trúc dự án & timeline
 ```
 
@@ -343,24 +344,15 @@ PRJ301---Group1/
    ```
 2. **Kiểm tra dịch vụ SQL Server:** Đảm bảo SQL Server đang chạy và cổng `1433` (TCP/IP) đã được kích hoạt (có thể chạy file [fix_sql.ps1](file:///c:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1/fix_sql.ps1) bằng quyền Administrator nếu gặp sự cố cổng TCP).
 3. **Cấu hình chuỗi kết nối:** Mở tệp [Main.java](file:///c:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1/src/main/java/com/group1/Main.java) và cập nhật tài khoản kết nối CSDL (mặc định: `sa` / mật khẩu quản trị).
-4. **Biên dịch và chạy thử:**
-   - **Cách 1: Sử dụng Java trực tiếp (đã có sẵn `mssql-jdbc.jar` trong repo):**
-     ```powershell
-     # Tạo thư mục output nếu chưa có
-     New-Item -ItemType Directory -Force -Path target/classes
-     
-     # Biên dịch mã nguồn với mã hóa UTF-8
-     javac -encoding UTF-8 -cp ".;mssql-jdbc.jar" -d target/classes (Get-ChildItem -Recurse src/main/java/*.java | ForEach-Object { $_.FullName })
-     
-     # Thực thi chương trình
-     java -cp "target/classes;mssql-jdbc.jar" com.group1.Main
-     ```
-   - **Cách 2: Sử dụng Apache Maven (nếu môi trường đã cài `mvn`):**
-     ```powershell
-     mvn clean compile
-     mvn exec:java -Dexec.mainClass="com.group1.Main"
-     ```
-5. **Kiểm tra kết quả:** Màn hình console sẽ thông báo `Connected to SQL Server!` thành công và hiển thị các bản ghi điểm số mẫu từ bảng `Score`.
+4. **Cấu hình biến môi trường DB** `DB_URL`, `DB_USER`, `DB_PASSWORD` theo SQL Server đang dùng.
+5. **Build và chạy Submission Portal Servlet/JSP chính thức:**
+   ```powershell
+   mvn --batch-mode clean package
+   ```
+   Deploy `target/aita.war` lên Apache Tomcat 9 (Servlet 4.0/JSP), khởi động Tomcat rồi mở `http://localhost:8080/aita/login`. Servlet API do Tomcat cung cấp; JSTL và SQL Server JDBC được đóng gói cùng WAR.
+6. **Chạy Java console (nếu cần demo riêng):** Mở `com.group1.Main` từ IDE với Maven dependencies đã nạp; đây không phải web entrypoint.
+
+Giao diện PRJ301 chạy bằng Servlet/JSP theo MVC2. `portal-node/` là prototype/tích hợp Node độc lập, không phải trang chính cần mở để demo luồng MVC2.
 
 ### 8.4. Kiểm thử tự động
 Chạy toàn bộ unit test và kiểm thử tích hợp HTTP cho luồng Servlet nộp ZIP:
@@ -369,15 +361,15 @@ Chạy toàn bộ unit test và kiểm thử tích hợp HTTP cho luồng Servle
 mvn --batch-mode test
 ```
 
-`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart qua `SubmissionSecurityFilter` tới `SubmissionController`, kiểm tra request chưa đăng nhập và tài khoản không phải sinh viên bị chặn trước khi servlet xử lý, đồng thời xác nhận SHA-256, lưu bài và chặn bài trùng. Filter kiểm tra session và vai trò; servlet tiếp tục kiểm tra lại quyền, xác thực ZIP và lưu dữ liệu.
+`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart qua `SubmissionSecurityFilter` tới `SubmissionController`, kiểm tra request chưa đăng nhập và tài khoản không phải sinh viên bị chặn trước khi servlet xử lý, tệp không phải ZIP bị từ chối, SHA-256 được tính tại Filter, và dữ liệu được lưu/chặn trùng đúng.
 
-Submission Portal dùng `GET /student/submissions` để hiển thị JSP lịch sử bài nộp theo người dùng và `POST /student/submissions` để gửi ZIP. Từ lịch sử, sinh viên mở `GET /student/analysis?submissionId=...` để xem AST JSON, nhận xét AI, từng lỗi, mức độ nghiêm trọng, vị trí và gợi ý sửa. Dashboard chỉ đọc bài nộp thuộc phiên đăng nhập; truy cập bài người khác trả về 404, bài chưa có phân tích hiển thị trạng thái chờ. Các view nằm dưới `WEB-INF/views`, sử dụng JSTL/EL và không thể truy cập trực tiếp qua URL. JSTL được khai báo trong `pom.xml`.
+Submission Portal dùng `GET /student/submissions` để hiển thị JSP lịch sử bài nộp theo người dùng và `POST /student/submissions` để gửi ZIP. `SubmissionSecurityFilter` kiểm tra session/role trước khi cho request qua; ở POST upload Filter kiểm tra multipart, tên/giới hạn ZIP, tính SHA-256 và gắn hash vào request. Servlet tiếp tục kiểm tra cấu trúc ZIP an toàn, chống trùng và lưu dữ liệu. Từ lịch sử, sinh viên mở `GET /student/analysis?submissionId=...` để xem AST JSON, nhận xét AI, từng lỗi, mức độ nghiêm trọng, vị trí và gợi ý sửa. Dashboard chỉ đọc bài nộp thuộc phiên đăng nhập; truy cập bài người khác trả về 404, bài chưa có phân tích hiển thị trạng thái chờ. `login.jsp`, `home.jsp` và các view khác nằm dưới `WEB-INF/views`, dùng JSTL/EL và không thể truy cập trực tiếp qua URL.
 
 Kiểm thử HTTP bao phủ luồng upload, vai trò sinh viên/giảng viên, hiển thị kết quả cho chủ bài nộp, từ chối bài của tài khoản khác và trạng thái chưa có kết quả.
 
 ### Luồng demo UI TV4
 
-Home điều hướng theo vai trò: sinh viên vào trang nộp/lịch sử; giảng viên vào danh sách bài nộp và xem kết quả toàn lớp. Kịch bản từng bước, dữ liệu cần chuẩn bị và các điểm demo bảo mật nằm trong [docs/DEMO_UI_TV4.md](./docs/DEMO_UI_TV4.md).
+Home điều hướng theo vai trò: sinh viên vào trang nộp/lịch sử; giảng viên vào danh sách bài nộp và xem kết quả toàn lớp. Kịch bản demo nằm trong [docs/DEMO_UI_TV4.md](./docs/DEMO_UI_TV4.md); wireframe, Use-case diagram và đặc tả luồng MVC2 nằm trong [docs/TV4_WIREFRAME_USE_CASE.md](./docs/TV4_WIREFRAME_USE_CASE.md).
 
 ---
 *Bản quyền tài liệu thuộc về **Nhóm 1 – PRJ301 (AITA Project)** | Lưu trữ tại GitHub: [rtafag/PRJ301---Group1](https://github.com/rtafag/PRJ301---Group1). Được cập nhật và hoàn thiện theo Đề cương chi tiết 10 tuần và Rubric Đánh giá Học thuật.*
