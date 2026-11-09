@@ -52,6 +52,20 @@ test('login determines the role from the matching account credentials', () => {
   assert.ok(auth.getUser(studentSession.token));
 });
 
+test('login accepts seeded SHA-256 password digests', () => {
+  const user = {
+    userId: 'HE001',
+    username: 'student1',
+    passwordHash: 'ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f',
+    fullName: 'Demo Student',
+    role: 'Student'
+  };
+  const auth = createAuth({ findUser: (username) => username === user.username ? user : null });
+
+  assert.ok(auth.login({ username: user.username, passwordHash: 'password123' }));
+  assert.equal(auth.login({ username: user.username, passwordHash: 'wrong-password' }), null);
+});
+
 test('password reset requires matching email and User ID and updates login credentials', () => {
   const user = {
     userId: 'HE001', username: 'student1', email: 'student@example.com',
