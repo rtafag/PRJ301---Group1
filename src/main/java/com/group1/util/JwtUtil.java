@@ -33,9 +33,14 @@ public class JwtUtil {
         }
     }
 
+    public static final String DEFAULT_SECRET = "super-secret-key-for-aita-jwt-group1-secret";
+
     private static String getSecret() {
         String secret = System.getenv("JWT_SECRET");
-        if (secret == null || secret.length() < 32) {
+        if (secret == null || secret.trim().isEmpty()) {
+            return DEFAULT_SECRET;
+        }
+        if (secret.length() < 32) {
             throw new IllegalStateException("Set JWT_SECRET to a value of at least 32 characters.");
         }
         return secret;

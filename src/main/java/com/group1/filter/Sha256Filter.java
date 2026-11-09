@@ -14,7 +14,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.Part;
 
-@WebFilter(filterName = "sha256Filter")
 public class Sha256Filter implements Filter {
     public static final String UPLOAD_BYTES_ATTRIBUTE = "submissionUploadBytes";
     public static final String UPLOAD_HASH_ATTRIBUTE = "submissionUploadSha256";

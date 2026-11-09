@@ -18,7 +18,6 @@ import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 
-@WebFilter(filterName = "authFilter")
 public class AuthFilter implements Filter {
     public static final String CSRF_SESSION_ATTRIBUTE = "submissionCsrfToken";
     static final String AUTHENTICATED_STUDENT_ATTRIBUTE = "authenticatedStudent";

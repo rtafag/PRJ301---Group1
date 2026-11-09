@@ -2,7 +2,8 @@ import hashlib
 import csv
 import os
 
-repo_dir = r"C:\Users\ADMIN\.gemini\antigravity\scratch\PRJ301---Group1"
+script_dir = os.path.dirname(os.path.abspath(__file__))
+repo_dir = os.path.abspath(os.path.join(script_dir, ".."))
 sub_file = os.path.join(repo_dir, "data", "submission.csv")
 users_file = os.path.join(repo_dir, "data", "users.csv")
 

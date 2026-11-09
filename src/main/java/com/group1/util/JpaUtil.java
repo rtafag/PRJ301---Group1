@@ -45,15 +45,15 @@ public class JpaUtil {
         properties.put("javax.persistence.jdbc.url", System.getenv().getOrDefault(
                 "DB_URL",
                 "jdbc:sqlserver://localhost:1433;databaseName=AITA_DB;encrypt=false;trustServerCertificate=true;"));
-        properties.put("javax.persistence.jdbc.user", requiredEnvironmentVariable("DB_USER"));
-        properties.put("javax.persistence.jdbc.password", requiredEnvironmentVariable("DB_PASSWORD"));
+        properties.put("javax.persistence.jdbc.user", getEnvOrDefault("DB_USER", "sa"));
+        properties.put("javax.persistence.jdbc.password", getEnvOrDefault("DB_PASSWORD", "password123"));
         return Persistence.createEntityManagerFactory("AITA_PU", properties);
     }
 
-    private static String requiredEnvironmentVariable(String name) {
+    private static String getEnvOrDefault(String name, String fallback) {
         String value = System.getenv(name);
         if (value == null || value.trim().isEmpty()) {
-            throw new IllegalStateException("Set " + name + " before initializing JPA.");
+            return fallback;
         }
         return value;
     }

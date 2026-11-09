@@ -1,16 +1,36 @@
 package com.group1.model;
 
 import java.io.Serializable;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
+@Entity
+@Table(name = "Users")
 public class Users implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    @Id
+    @Column(name = "user_id", length = 50, nullable = false)
     public String userId;
+
+    @Column(name = "username", length = 100, nullable = false, unique = true)
     public String username;
+
+    @Column(name = "password_hash", length = 255, nullable = false)
     public String passwordHash;
+
+    @Column(name = "full_name", length = 100)
     public String fullName;
+
+    @Column(name = "email", length = 100)
     public String email;
+
+    @Column(name = "role", length = 50, nullable = false)
     public String role;
+
+    @Column(name = "created_at")
     public String createdAt;
 
     public Users() {

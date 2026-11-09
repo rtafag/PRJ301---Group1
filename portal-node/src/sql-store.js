@@ -225,10 +225,10 @@ export async function createSqlRuntimeRepository() {
 
       // 3. Submissions, Scores, AnalysisResult, RuleViolation
       if (Array.isArray(runtimeData.submissions) && runtimeData.submissions.length > 0) {
-        // Deduplicate submissions by submissionId (last-write-wins)
+        // Deduplicate submissions by submissionId (first-write-wins)
         const uniqueSubsMap = new Map();
         for (const s of runtimeData.submissions) {
-          if (s && s.submissionId) {
+          if (s && s.submissionId && !uniqueSubsMap.has(s.submissionId)) {
             uniqueSubsMap.set(s.submissionId, s);
           }
         }

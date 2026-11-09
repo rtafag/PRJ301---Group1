@@ -34,12 +34,12 @@
 
 ### 1.1. Bối cảnh & Vấn đề giải quyết
 * **Vấn đề cốt lõi:** Hiện tượng **Burnout (kiệt sức)** của giảng viên Công nghệ Thông tin khi phải đối mặt với khối lượng khổng lồ bài nộp thực hành lập trình trong mỗi học kỳ. Việc chấm điểm thủ công tốn nhiều công sức nhưng phản hồi tới sinh viên thường bị chậm trễ và thiếu chiều sâu giải thích logic.
-* **Tầm nhìn AITA:** Là sự giao thoa hoàn hảo giữa nền tảng **Java Web truyền thống (Syllabus PRJ301 - Servlet, JSP, MVC2, JDBC)** và các **công nghệ tính toán tiên tiến (AST, Roslyn, Docker Sandbox, AI LLMs, Redis Queue)**. Hệ thống chuyển đổi mô hình từ quản lý học tập thụ động thành **Trợ lý giảng dạy chủ động (Active AI Teaching Assistant)**.
+* **Tầm nhìn AITA:** Là sự giao thoa hoàn hảo giữa nền tảng **Java Web truyền thống (Syllabus PRJ301 - Servlet, JSP, MVC2, JDBC)** và các **công nghệ tính toán tiên tiến (AST, JavaParser, Docker Sandbox, AI LLMs, Redis Queue)**. Hệ thống chuyển đổi mô hình từ quản lý học tập thụ động thành **Trợ lý giảng dạy chủ động (Active AI Teaching Assistant)**.
 
 ### 1.2. Phân ban Nghiên cứu: Nhóm 1 – AI Static Code Analysis & AST
 * **Mục tiêu chuyên sâu:** Xây dựng bộ phân tích mã nguồn tĩnh (Static Analysis Engine) bóc tách cấu trúc cú pháp thành **Cây cú pháp trừu tượng (Abstract Syntax Tree - AST)** để phát hiện triệt để các lỗi logic, bẫy tiềm ẩn và code smell mà **không cần thực thi mã nguồn**.
 * **Công nghệ cốt lõi:**
-  - Thư viện bóc tách cú pháp: **Roslyn / AST Visitor Parser**.
+  - Thư viện bóc tách cú pháp: **JavaParser (AST Syntax Visitor Parser)**.
   - Chuẩn hóa trung gian: **JSON Schema** liên kết giữa Core Engine, Database, Rule Engine và UI.
   - Trí tuệ nhân tạo: **OpenAI / Google Gemini API** để chuyển hóa các lỗi cú pháp/logic thành phản hồi sư phạm tự nhiên, dễ tiếp thu cho sinh viên.
   - Bảo mật & hạ tầng: **Docker Sandbox cô lập (Resource Limits)**, nén ZIP, băm bảo mật **SHA-256**, hàng đợi **Redis Priority & Retry Queue**.
@@ -67,7 +67,7 @@ flowchart TD
 
     subgraph Sandbox_Environment ["4. Docker Sandbox Cô lập"]
         RedisQ -->|Phân phối tác vụ| DockerSB["Docker Sandbox (Giới hạn CPU, RAM, No Network)"]
-        DockerSB --> AST_Core["AST Core Engine (Roslyn / JavaParser)"]
+        DockerSB --> AST_Core["AST Core Engine (JavaParser)"]
         AST_Core -->|Sinh cấu trúc chuẩn| AST_JSON["JSON AST Schema"]
     end
 
@@ -162,7 +162,7 @@ Mỗi thành viên phụ trách độc lập một mảng kỹ thuật chuyên s
 
 | Thành viên | Vai trò Kỹ thuật | Mảng Phụ trách Chính (Kỹ thuật) | Ánh xạ Rubric |
 | :--- | :--- | :--- | :--- |
-| **TV1** | **AST Core Engine Lead**<br>*(Trưởng nhóm)* | • Module lõi dùng Roslyn parse mã nguồn (C#/Java) thành AST, viết Syntax Visitor.<br>• Chuẩn hóa output (JSON schema) cho Rule Engine, Database, UI tiêu thụ.<br>• Điều phối tiến độ chung, tổng hợp công việc trước mỗi buổi Peer-Review. | **Application (Use of Concepts)**<br>*(25 điểm)* |
+| **TV1** | **AST Core Engine Lead**<br>*(Trưởng nhóm)* | • Module lõi dùng JavaParser parse mã nguồn Java thành AST, viết Syntax Visitor.<br>• Chuẩn hóa output (JSON schema) cho Rule Engine, Database, UI tiêu thụ.<br>• Điều phối tiến độ chung, tổng hợp công việc trước mỗi buổi Peer-Review. | **Application (Use of Concepts)**<br>*(25 điểm)* |
 | **TV2** | **Backend & Database Engineer** | • Thiết kế ERD chuẩn hóa 6 bảng: `Users`, `Submission`, `AnalysisResult`, `RuleViolation`, `RuleDefinition`, `Score`.<br>• Tạo Database & Table thật trong Microsoft SQL Server (SSMS), chuẩn hóa CSDL, xây dựng tầng DAO/JDBC.<br>• Triển khai xác thực JWT Authentication, sinh dữ liệu mẫu (Sample data). | **Database Design**<br>*(10 điểm)* |
 | **TV3** | **AI Rule / Detection Engineer** | • Xây dựng bộ quy tắc phát hiện lỗi logic trên AST (Null check, vòng lặp vô hạn, code smell).<br>• Tích hợp OpenAI/Gemini API để diễn giải lỗi kỹ thuật thành phản hồi tự nhiên dễ hiểu.<br>• Xây dựng bộ Test case cho từng rule, phối hợp cùng TV1 chuẩn hóa luồng input/output. | **AI Integration**<br>*(10 điểm)* |
 | **TV4** | **Web / MVC2 Frontend Engineer** | • Xây dựng Submission Portal (Servlet/JSP, MVC2 Pattern, Filter, Expression Language).<br>• Phát triển Dashboard trực quan hóa kết quả AST: danh sách lỗi, mức độ nghiêm trọng, vị trí dòng, gợi ý sửa.<br>• Thiết kế Wireframe/UI Prototype, Use-case Diagram và kiểm thử đa luồng người dùng. | **User Interface (UI/UX)**<br>*(10 điểm)* |
@@ -188,7 +188,7 @@ Mỗi thành viên phụ trách độc lập một mảng kỹ thuật chuyên s
 
 | TV | Việc phải LÀM (Trước buổi Peer-Review) | Nội dung phải THUYẾT TRÌNH (≈ 4–5 phút/người) |
 | :---: | :--- | :--- |
-| **TV1** | • Hoàn thiện AST Core Engine parse thử nghiệm với Roslyn.<br>• Chuẩn hóa dữ liệu output thành JSON Schema; viết Syntax Visitor duyệt cây mã nguồn. | • **Demo AST Core Engine:** bóc tách trực tiếp một đoạn code thật ra định dạng JSON schema.<br>• Trình bày phương thức chuyển giao schema để Rule Engine (TV3) và UI (TV4) tiêu thụ. |
+| **TV1** | • Hoàn thiện AST Core Engine parse thử nghiệm với JavaParser.<br>• Chuẩn hóa dữ liệu output thành JSON Schema; viết Syntax Visitor duyệt cây mã nguồn. | • **Demo AST Core Engine:** bóc tách trực tiếp một đoạn code thật ra định dạng JSON schema.<br>• Trình bày phương thức chuyển giao schema để Rule Engine (TV3) và UI (TV4) tiêu thụ. |
 | **TV2** | • Hoàn thiện tầng DAO/JDBC kết nối vào Database SQL Server đã tạo ở PR1.<br>• Chuẩn bị dữ liệu mẫu chuẩn hóa phục vụ demo chu trình MVC2 hoàn chỉnh. | • Demo tầng DAO/JDBC hoàn chỉnh: chứng minh Submission Portal ghi/đọc dữ liệu chính xác trên SQL Server.<br>• Giải thích cấu trúc dữ liệu mẫu dùng cho demo. |
 | **TV3** | • Xây dựng quy tắc đầu tiên phát hiện lỗi logic trên AST (Null check, vòng lặp vô hạn).<br>• Viết bộ test case kiểm thử độ chính xác cho rule vừa xây dựng. | • **Demo Rule Engine v1:** phát hiện chính xác lỗi trên một tập tin code mẫu.<br>• Báo cáo kết quả kiểm thử test case và tỉ lệ nhận diện sai (false positive). |
 | **TV4** | • Hoàn thiện Submission Portal hoàn chỉnh (áp dụng kiến trúc Servlet/JSP, MVC2, Filter, Expression Language).<br>• Cấu hình tầng Filter để kiểm tra bảo mật trước khi cho phép nộp bài. | • **Demo Submission Portal:** nộp bài hoàn chỉnh từ giao diện web cho đến khi lưu trữ vào Database.<br>• Phân tích cơ chế Filter bảo mật và xác thực tầng MVC2. |
@@ -357,21 +357,15 @@ PRJ301---Group1/
    git clone https://github.com/rtafag/PRJ301---Group1.git
    cd PRJ301---Group1
    ```
-2. **Kiểm tra dịch vụ SQL Server:** Đảm bảo SQL Server đang chạy và cổng `1433` (TCP/IP) đã được kích hoạt (có thể chạy file [fix_sql.ps1](file:///c:/Users/ADMIN/.gemini/antigravity/scratch/PRJ301---Group1/fix_sql.ps1) bằng quyền Administrator nếu gặp sự cố cổng TCP).
+2. **Kiểm tra dịch vụ SQL Server:** Đảm bảo SQL Server đang chạy và cổng `1433` (TCP/IP) đã được kích hoạt qua SQL Server Configuration Manager.
 3. **Cấu hình kết nối:** Đặt `DB_URL`, `DB_USER`, `DB_PASSWORD` cho SQL Server và `JWT_SECRET` (ít nhất 32 ký tự) trong môi trường chạy ứng dụng. Không lưu mật khẩu hoặc JWT secret trong mã nguồn.
 4. **Biên dịch và chạy thử:**
-   - **Cách 1: Sử dụng Java trực tiếp (đã có sẵn `mssql-jdbc.jar` trong repo):**
+   - **Cách 1: Sử dụng Apache Maven (Khuyến nghị):**
      ```powershell
-     # Tạo thư mục output nếu chưa có
-     New-Item -ItemType Directory -Force -Path target/classes
-     
-     # Biên dịch mã nguồn với mã hóa UTF-8
-     javac -encoding UTF-8 -cp ".;mssql-jdbc.jar" -d target/classes (Get-ChildItem -Recurse src/main/java/*.java | ForEach-Object { $_.FullName })
-     
-     # Thực thi chương trình
-     java -cp "target/classes;mssql-jdbc.jar" com.group1.Main
+     mvn clean compile
+     mvn exec:java -Dexec.mainClass="com.group1.Main"
      ```
-   - **Cách 2: Sử dụng Apache Maven (nếu môi trường đã cài `mvn`):**
+   - **Cách 2: Chạy kiểm thử tự động toàn bộ: (nếu môi trường đã cài `mvn`):**
      ```powershell
      mvn clean package
      mvn exec:java -Dexec.mainClass="com.group1.Main"

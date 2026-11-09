@@ -1,15 +1,33 @@
 package com.group1.model;
 
 import java.io.Serializable;
+import javax.persistence.Column;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Table;
 
+@Entity
+@Table(name = "Submission")
 public class Submission implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    @Id
+    @Column(name = "submission_id", length = 50, nullable = false)
     public String submissionId;
+
+    @Column(name = "user_id", length = 50, nullable = false)
     public String userId;
+
+    @Column(name = "file_url", columnDefinition = "VARCHAR(MAX)")
     public String fileUrl;
+
+    @Column(name = "file_hash", length = 100)
     public String fileHash;
+
+    @Column(name = "status", length = 50)
     public String status;
+
+    @Column(name = "submitted_at")
     public String submittedAt;
 
     public Submission() {
