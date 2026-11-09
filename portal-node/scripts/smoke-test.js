@@ -325,7 +325,7 @@ const studentAccounts = parse(readFileSync(new URL('../../data/users.csv', impor
 const peerIndex = sourceStudents.findIndex((item, index) => item.CourseCode.split('|').includes(firstCourse.courseCode)
   && studentAccounts[index]?.userId !== academicStudent.user.userId);
 assert.ok(peerIndex >= 0, 'An enrolled peer should be available for similarity testing');
-const peer = await login(studentAccounts[peerIndex].username, studentAccounts[peerIndex].passwordHash, 'Student');
+const peer = await login(studentAccounts[peerIndex].username, demoPassword, 'Student');
 const similarSubmissionForm = new FormData();
 similarSubmissionForm.append('assignmentId', createdAssignment.assignmentId);
 similarSubmissionForm.append('sourceFile', new Blob([`public class ${similarClassName} { public Object value() { return null; } }`]), `${similarClassName}.java`);
