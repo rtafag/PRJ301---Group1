@@ -83,7 +83,7 @@ export async function createSqlRuntimeRepository() {
 
       // 4. Load Submission, Score, AnalysisResult
       const subResult = await pool.request().query(`
-        SELECT 
+        SELECT
           s.submission_id, s.user_id, s.file_url, s.file_hash, s.status, s.submitted_at,
           sc.score_id, sc.total_score, sc.deduction, sc.grading_notes, sc.updated_at AS score_updated_at,
           ar.analysis_id, ar.ast_json, ar.ai_feedback, ar.execution_time_ms
@@ -153,7 +153,7 @@ export async function createSqlRuntimeRepository() {
           .input('userUpdatesJson', sql.NVarChar(sql.MAX), JSON.stringify(userUpdates))
           .query(`
             UPDATE u
-            SET 
+            SET
               full_name = COALESCE(j.fullName, u.full_name),
               email = COALESCE(j.email, u.email),
               password_hash = COALESCE(j.passwordHash, u.password_hash)
@@ -290,10 +290,10 @@ export async function createSqlRuntimeRepository() {
             .input('scoresJson', sql.NVarChar(sql.MAX), JSON.stringify(scoresData))
             .query(`
               DECLARE @maxScoreId INT = (SELECT ISNULL(MAX(score_id), 0) FROM Score);
-              
+
               MERGE Score WITH (HOLDLOCK) AS target
               USING (
-                SELECT 
+                SELECT
                   COALESCE(sc.score_id, @maxScoreId + ROW_NUMBER() OVER (ORDER BY j.submissionId)) AS score_id,
                   j.submissionId AS submission_id,
                   j.totalScore AS total_score,
@@ -327,7 +327,7 @@ export async function createSqlRuntimeRepository() {
 
               MERGE AnalysisResult WITH (HOLDLOCK) AS target
               USING (
-                SELECT 
+                SELECT
                   COALESCE(ar.analysis_id, @maxAnalysisId + ROW_NUMBER() OVER (ORDER BY j.submissionId)) AS analysis_id,
                   j.submissionId AS submission_id,
                   j.astJson AS ast_json,
@@ -365,7 +365,7 @@ export async function createSqlRuntimeRepository() {
               DECLARE @maxViolId INT = (SELECT ISNULL(MAX(violation_id), 0) FROM RuleViolation);
 
               INSERT INTO RuleViolation (violation_id, analysis_id, rule_id, file_name, line_number, suggested_fix)
-              SELECT 
+              SELECT
                 @maxViolId + ROW_NUMBER() OVER (ORDER BY j.submissionId, j.ruleId, j.lineNumber) AS violation_id,
                 ar.analysis_id,
                 j.ruleId,

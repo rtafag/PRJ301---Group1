@@ -1,14 +1,14 @@
 # HƯỚNG DẪN THUYẾT TRÌNH & KỊCH BẢN BẢO VỆ ĐỒ ÁN AITA (PRJ301 - NHÓM 1)
 
-Dự án: **AITA - AI-Powered Teaching Assistant System**  
-Môn học: **PRJ301 - Java Web Applications**  
+Dự án: **AITA - AI-Powered Teaching Assistant System**
+Môn học: **PRJ301 - Java Web Applications**
 Mẫu giao diện: **Công nghệ thông tin (Tech Circuit Cyan - Amber - Navy)**
 
 ---
 
 ## 1. CÁCH MỞ VÀ TRÌNH CHIẾU SLIDE INTERACTIVE
 
-File slide HTML tương tác chuyên nghiệp đã được thiết kế sẵn tại:  
+File slide HTML tương tác chuyên nghiệp đã được thiết kế sẵn tại:
 👉 `slides/index.html`
 
 ### Cách dùng:

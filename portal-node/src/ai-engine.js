@@ -160,10 +160,10 @@ export function extractSlicedContext(source, findings) {
 
 export function buildPromptPayload(source, findings) {
   const slicedContext = extractSlicedContext(source, findings);
-  const violationsList = findings.map((f, i) => 
+  const violationsList = findings.map((f, i) =>
     `${i + 1}. [${f.ruleCode}] ${f.ruleName || f.ruleCode} (Dòng ${f.lineNumber}): ${f.suggestedFix}`
   ).join('\n');
-  
+
   return `Danh sách vi phạm do AST Rule Engine phát hiện (${findings.length} lỗi):\n${violationsList}\n\nTrích đoạn mã nguồn ngữ cảnh xung quanh dòng bị lỗi (Context Slicing):\n${slicedContext}`;
 }
 

@@ -59,7 +59,7 @@ CREATE TABLE dbo.Submission (
     status VARCHAR(50) NOT NULL DEFAULT 'Submitted',
     submitted_at DATETIME NULL DEFAULT GETDATE(),
     CONSTRAINT PK_Submission PRIMARY KEY CLUSTERED (submission_id ASC),
-    CONSTRAINT FK_Submission_Users FOREIGN KEY (user_id) 
+    CONSTRAINT FK_Submission_Users FOREIGN KEY (user_id)
         REFERENCES dbo.Users (user_id) ON DELETE CASCADE
 );
 GO
@@ -74,7 +74,7 @@ CREATE TABLE dbo.Score (
     updated_at DATETIME NULL DEFAULT GETDATE(),
     CONSTRAINT PK_Score PRIMARY KEY CLUSTERED (score_id ASC),
     CONSTRAINT UQ_Score_Submission UNIQUE (submission_id),
-    CONSTRAINT FK_Score_Submission FOREIGN KEY (submission_id) 
+    CONSTRAINT FK_Score_Submission FOREIGN KEY (submission_id)
         REFERENCES dbo.Submission (submission_id) ON DELETE CASCADE
 );
 GO
@@ -88,7 +88,7 @@ CREATE TABLE dbo.AnalysisResult (
     execution_time_ms INT NULL DEFAULT 0,
     CONSTRAINT PK_AnalysisResult PRIMARY KEY CLUSTERED (analysis_id ASC),
     CONSTRAINT UQ_AnalysisResult_Submission UNIQUE (submission_id),
-    CONSTRAINT FK_Analysis_Submission FOREIGN KEY (submission_id) 
+    CONSTRAINT FK_Analysis_Submission FOREIGN KEY (submission_id)
         REFERENCES dbo.Submission (submission_id) ON DELETE CASCADE
 );
 GO
@@ -102,9 +102,9 @@ CREATE TABLE dbo.RuleViolation (
     line_number INT NULL,
     suggested_fix NVARCHAR(MAX) NULL,
     CONSTRAINT PK_RuleViolation PRIMARY KEY CLUSTERED (violation_id ASC),
-    CONSTRAINT FK_Violation_Analysis FOREIGN KEY (analysis_id) 
+    CONSTRAINT FK_Violation_Analysis FOREIGN KEY (analysis_id)
         REFERENCES dbo.AnalysisResult (analysis_id) ON DELETE CASCADE,
-    CONSTRAINT FK_Violation_Rule FOREIGN KEY (rule_id) 
+    CONSTRAINT FK_Violation_Rule FOREIGN KEY (rule_id)
         REFERENCES dbo.RuleDefinition (rule_id)
 );
 GO

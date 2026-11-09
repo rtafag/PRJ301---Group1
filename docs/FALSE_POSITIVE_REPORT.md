@@ -1,6 +1,6 @@
 # BÁO CÁO ĐO LƯỜNG TỈ LỆ FALSE POSITIVE & HIỆU NĂNG 15 AST RULES
-**Dự án:** AITA (AI-Powered Teaching Assistant System) — Môn PRJ301  
-**Phân ban:** TV3 (AI Rule / Detection Engineer)  
+**Dự án:** AITA (AI-Powered Teaching Assistant System) — Môn PRJ301
+**Phân ban:** TV3 (AI Rule / Detection Engineer)
 **Ngày cập nhật:** 09/11/2026 (Phiên bản chuẩn hóa sau Audit)
 
 ---

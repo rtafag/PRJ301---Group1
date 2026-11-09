@@ -12,12 +12,12 @@ function escapeXml(str) {
 }
 
 function makeTextSp({ id, name, x, y, cx, cy, paragraphs, bgClr = null, borderClr = null, align = 'l' }) {
-  let fillXml = bgClr 
-    ? `<a:solidFill><a:srgbClr val="${bgClr}"/></a:solidFill>` 
+  let fillXml = bgClr
+    ? `<a:solidFill><a:srgbClr val="${bgClr}"/></a:solidFill>`
     : '<a:noFill/>';
-    
-  let lnXml = borderClr 
-    ? `<a:ln w="12700"><a:solidFill><a:srgbClr val="${borderClr}"/></a:solidFill></a:ln>` 
+
+  let lnXml = borderClr
+    ? `<a:ln w="12700"><a:solidFill><a:srgbClr val="${borderClr}"/></a:solidFill></a:ln>`
     : '<a:ln><a:noFill/></a:ln>';
 
   let geom = bgClr ? 'roundRect' : 'rect';
@@ -27,7 +27,7 @@ function makeTextSp({ id, name, x, y, cx, cy, paragraphs, bgClr = null, borderCl
     let pAlgn = p.align || align;
     let bulletXml = p.bullet ? '<a:buChar char="•"/>' : '<a:buNone/>';
     let marL = p.bullet ? 'marL="285750" indent="-285750"' : '';
-    
+
     let runs = (p.runs || [{ t: p.text || '', sz: p.sz, b: p.b, clr: p.clr, i: p.i }]).map(r => `
       <a:r>
         <a:rPr lang="vi-VN" sz="${r.sz || 1400}" b="${r.b ? '1' : '0'}" i="${r.i ? '1' : '0'}">
@@ -93,7 +93,7 @@ function makeHeader(title, subtitle, tagText = null) {
     }));
     yOffset += 260000;
   }
-  
+
   list.push(makeTextSp({
     id: 100,
     name: "Header Title",
@@ -136,7 +136,7 @@ function updateSlideXml(slideNum, newShapesXml) {
   // Keep shapes that are large containers or special graphics
   const sps = [...inner.matchAll(/<p:sp>[\s\S]*?<\/p:sp>/g)].map(m => m[0]);
   const keptSps = [];
-  
+
   sps.forEach(sp => {
     const ext = sp.match(/<a:ext cx="(\d+)" cy="(\d+)"\/>/);
     const off = sp.match(/<a:off x="(\d+)" y="(\d+)"\/>/);

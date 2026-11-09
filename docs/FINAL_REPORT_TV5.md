@@ -1,9 +1,9 @@
 # BÁO CÁO KỸ THUẬT CUỐI KỲ — AITA
 
-**Môn học:** PRJ301  
-**Nhóm:** Group 1  
-**Phân công:** TV5 — Integration & QA/DevOps Engineer  
-**Ngày lập:** 09/11/2026  
+**Môn học:** PRJ301
+**Nhóm:** Group 1
+**Phân công:** TV5 — Integration & QA/DevOps Engineer
+**Ngày lập:** 09/11/2026
 **Phạm vi:** Kiến trúc và chức năng hiện có trong repository, tập trung vào tích hợp, kiểm thử, CI, Redis, SHA-256 và sandbox.
 
 ---
