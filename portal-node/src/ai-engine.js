@@ -142,8 +142,47 @@ function runStaticRules(source, rules) {
   return findings;
 }
 
+export function extractSlicedContext(source, findings) {
+  if (!source || !findings || findings.length === 0) return '';
+  const lines = source.split('\n');
+  return findings.map((f) => {
+    const errLine = f.lineNumber || 1;
+    const start = Math.max(0, errLine - 3);
+    const end = Math.min(lines.length - 1, errLine + 2);
+    const snippet = [];
+    for (let l = start; l <= end; l++) {
+      const prefix = (l + 1 === errLine) ? '>> ' : '   ';
+      snippet.push(`${prefix}${l + 1}: ${lines[l]}`);
+    }
+    return `--- Ngữ cảnh Dòng ${errLine} (Rule: ${f.ruleCode}) ---\n${snippet.join('\n')}`;
+  }).join('\n\n');
+}
+
+export function buildPromptPayload(source, findings) {
+  const slicedContext = extractSlicedContext(source, findings);
+  const violationsList = findings.map((f, i) => 
+    `${i + 1}. [${f.ruleCode}] ${f.ruleName || f.ruleCode} (Dòng ${f.lineNumber}): ${f.suggestedFix}`
+  ).join('\n');
+  
+  return `Danh sách vi phạm do AST Rule Engine phát hiện (${findings.length} lỗi):\n${violationsList}\n\nTrích đoạn mã nguồn ngữ cảnh xung quanh dòng bị lỗi (Context Slicing):\n${slicedContext}`;
+}
+
+const AI_SYSTEM_PROMPT = `You are an expert Java Teaching Assistant in the AITA system for PRJ301.
+Your objective is to provide pedagogical, constructive code review in GitHub-flavored Markdown.
+STRICT ANTI-HALLUCINATION CONSTRAINTS:
+1. Base review ONLY on the exact AST violations and sliced lines provided. NEVER invent imaginary errors.
+2. Do NOT change, assign, or recalculate numeric grades.
+3. For EACH violation, structure feedback with:
+   - Root Cause & Runtime Risk
+   - Recommended Fix & Code Snippet (Before/After)
+   - Best Practice Tip (PRJ301 / Effective Java)
+4. Respond in Vietnamese.`;
+
 async function requestExternalFeedback(source, findings) {
+  if (!findings || findings.length === 0) return '';
   const provider = (process.env.AI_PROVIDER ?? 'disabled').toLowerCase();
+  const userPrompt = buildPromptPayload(source, findings);
+
   if (provider === 'openai' && process.env.OPENAI_API_KEY) {
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -155,8 +194,8 @@ async function requestExternalFeedback(source, findings) {
       body: JSON.stringify({
         model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'Review Java source for learning. Explain issues briefly. Do not assign or change the numeric grade.' },
-          { role: 'user', content: JSON.stringify({ findings, source }) }
+          { role: 'system', content: AI_SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt }
         ],
         temperature: 0.2
       })
@@ -173,8 +212,8 @@ async function requestExternalFeedback(source, findings) {
       headers: { 'Content-Type': 'application/json' },
       signal: AbortSignal.timeout(15000),
       body: JSON.stringify({
-        systemInstruction: { parts: [{ text: 'Review Java source for learning. Explain issues briefly. Do not assign or change the numeric grade.' }] },
-        contents: [{ parts: [{ text: JSON.stringify({ findings, source }) }] }]
+        systemInstruction: { parts: [{ text: AI_SYSTEM_PROMPT }] },
+        contents: [{ parts: [{ text: userPrompt }] }]
       })
     });
     if (!response.ok) throw new Error(`Gemini request failed with status ${response.status}.`);

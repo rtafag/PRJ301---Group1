@@ -47,6 +47,30 @@ public class ASTRuleEngine {
         visitors.add(new DuplicateCodeVisitor());
     }
 
+    public static List<RuleDefinition> getDefaultRules() {
+        List<RuleDefinition> rules = new ArrayList<>();
+        rules.add(new RuleDefinition(1, "INF_LOOP", "Infinite Loop", "Error", 10.0f, "Loop has no termination condition or counter runs backwards"));
+        rules.add(new RuleDefinition(2, "STR_EQ", "String comparison with ==", "Warning", 2.0f, "Compare strings with .equals() instead of =="));
+        rules.add(new RuleDefinition(3, "DIV_ZERO", "Division by zero", "Error", 3.0f, "Division by constant zero causes ArithmeticException"));
+        rules.add(new RuleDefinition(4, "ASSIGN_IN_COND", "Assignment in condition", "Error", 2.5f, "Assignment operator = used instead of comparison =="));
+        rules.add(new RuleDefinition(5, "DEAD_CODE", "Dead code after return", "Warning", 1.0f, "Unreachable code following return or throw statement"));
+        rules.add(new RuleDefinition(6, "MISSING_OVERRIDE", "Missing @Override", "Info", 1.0f, "Subclass method overrides superclass/interface without @Override"));
+        rules.add(new RuleDefinition(7, "EQUALS_HASHCODE", "equals without hashCode", "Warning", 1.5f, "Overriding equals() requires overriding hashCode()"));
+        rules.add(new RuleDefinition(8, "DUPLICATE_CODE", "Duplicate code block", "Warning", 1.5f, "Identical method body found in same class"));
+        rules.add(new RuleDefinition(9, "RES_LEAK", "Resource leak", "Error", 2.5f, "Connection, Statement, or ResultSet not closed"));
+        rules.add(new RuleDefinition(10, "EMPTY_CATCH", "Empty catch block", "Warning", 1.5f, "Catch block catches exception but does nothing"));
+        rules.add(new RuleDefinition(11, "NPE", "Null return", "Warning", 2.0f, "Avoid returning null directly without checks"));
+        rules.add(new RuleDefinition(12, "OOM", "Memory leak in loop", "Critical", 5.0f, "Allocating large objects or arrays inside loops"));
+        rules.add(new RuleDefinition(13, "CS", "Naming convention", "Low", 0.5f, "Class names must start with uppercase letter"));
+        rules.add(new RuleDefinition(14, "LONG_METHOD", "Long method", "Medium", 1.0f, "Method exceeds 40 lines of code"));
+        rules.add(new RuleDefinition(15, "COMMENT", "Missing comments", "Low", 0.5f, "Public classes and methods should have Javadoc comments"));
+        return rules;
+    }
+
+    public AnalysisOutcome analyze(String sourceCode) {
+        return analyze(sourceCode, getDefaultRules());
+    }
+
     public AnalysisOutcome analyze(String sourceCode, List<RuleDefinition> configuredRules) {
         AnalysisOutcome outcome = new AnalysisOutcome();
         CompilationUnit unit;

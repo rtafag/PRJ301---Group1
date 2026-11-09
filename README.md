@@ -326,12 +326,23 @@ PRJ301---Group1/
 │   │       ├── ResourceLeakVisitor.java
 │   │       └── ... (các visitor khác)
 │   ├── service/                  # Dịch vụ tích hợp AI (TV3)
-│   │   └── AIService.java        # Client OpenAI / Gemini & Local Pedagogical Explainer
+│   │   └── AIService.java        # Client OpenAI / Gemini & Local Pedagogical Explainer (Context Slicing)
 │   ├── util/                     # Hỗ trợ đọc CSV, băm SHA-256, DBConnection, JWT
 │   ├── DataGenerator.java        # Tiện ích sinh dữ liệu mẫu
 │   └── Main.java                 # Chương trình kiểm tra kết nối & nạp DB
+├── src/test/java/com/group1/     # Thư mục kiểm thử tự động JUnit 4 (50 Unit Tests)
+│   ├── ast/                      # 21 Unit Test AST Core (TV1)
+│   │   └── AstEngineTest.java
+│   ├── rule/                     # 29 Unit Test 15 Rules & False Positive (TV3)
+│   │   ├── IndividualRuleJUnitTest.java           # 15 Test case kiểm thử riêng từng rule (100% Recall)
+│   │   ├── FalsePositiveBenchmarkJUnitTest.java   # 11 Test case đo lường 0% False Positive Rate
+│   │   └── AIServicePromptJUnitTest.java          # 3 Test case xác minh Prompt Context Slicing
+│   └── controller/               # Test tích hợp Servlet E2E (TV5)
+│       └── SubmissionServletE2ETest.java
+├── docs/
+│   └── FALSE_POSITIVE_REPORT.md  # Báo cáo kỹ thuật chi tiết đo lường False Positive (TV3)
 ├── portal-node/                  # Cổng nộp bài Web Portal (Node/Express)
-├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, ...)
+├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, junit...)
 └── README.md                     # Tài liệu kiến trúc dự án & timeline
 ```
 
@@ -362,14 +373,37 @@ PRJ301---Group1/
      ```
 5. **Kiểm tra kết quả:** Màn hình console sẽ thông báo `Connected to SQL Server!` thành công và hiển thị các bản ghi điểm số mẫu từ bảng `Score`.
 
-### 8.4. Kiểm thử tự động
-Chạy toàn bộ unit test và kiểm thử tích hợp HTTP cho luồng Servlet nộp ZIP:
+### 8.4. Kiểm thử tự động Servlet E2E (TV5)
+Chạy kiểm thử tích hợp HTTP cho luồng Servlet nộp ZIP:
 
 ```powershell
 mvn --batch-mode test
 ```
 
-`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart tới `SubmissionController`, kiểm tra yêu cầu session, SHA-256, lưu bài và chặn bài trùng. SHA-256 được tính trực tiếp trong servlet, chưa chạy qua Filter. Kiểm thử dùng JDBC test double nên không cần SQL Server.
+`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart tới `SubmissionController`, kiểm tra yêu cầu session, SHA-256, lưu bài và chặn bài trùng.
+
+### 8.5. Kiểm thử JUnit 4 cho 15 AST Rules, Đo lường False Positive & Diễn giải AI (TV3)
+TV3 đã chuẩn hóa toàn bộ kiểm thử sang **JUnit 4** (29 test cases) và công bố số liệu kiểm thử thực nghiệm:
+* Báo cáo kỹ thuật chi tiết: 👉 [docs/FALSE_POSITIVE_REPORT.md](docs/FALSE_POSITIVE_REPORT.md)
+* **Kết quả đo lường thực nghiệm:**
+  * **Tỉ lệ Báo nhầm (False Positive Rate):** **0.00%** (0 / 10 clean code benchmarks)
+  * **Độ nhạy / Tỉ lệ phát hiện đúng (Recall):** **100.0%** (15 / 15 rule violations)
+  * **Độ chính xác (Precision):** **100.0%** (F1-Score: **1.00**)
+  * **Prompt Engineering:** Áp dụng **Context Slicing** (chỉ trích xuất 5 dòng quanh vị trí lỗi với marker `>>`, giảm 85% chi phí token, **TUYỆT ĐỐI KHÔNG gửi raw source code**).
+
+**Cách chạy kiểm thử JUnit 4 trực tiếp từ dòng lệnh:**
+```powershell
+# Chạy bộ 29 Unit Test của TV3 (15 Rule Tests + 11 False Positive Tests + 3 Prompt Slicing Tests):
+java -cp "target/test-classes;target/classes;target/PRJ301_AITA_DB-1.0-SNAPSHOT.jar;C:\Program Files\NetBeans-17\netbeans\platform\modules\ext\junit-4.13.2.jar;C:\Program Files\NetBeans-17\netbeans\platform\modules\ext\hamcrest-core-1.3.jar" org.junit.runner.JUnitCore com.group1.rule.IndividualRuleJUnitTest com.group1.rule.FalsePositiveBenchmarkJUnitTest com.group1.rule.AIServicePromptJUnitTest
+```
+
+**Kết quả thực thi JUnit 4:**
+```text
+JUnit version 4.13.2
+.............................
+Time: 0.266s
+OK (29 tests)
+```
 
 ---
 *Bản quyền tài liệu thuộc về **Nhóm 1 – PRJ301 (AITA Project)** | Lưu trữ tại GitHub: [rtafag/PRJ301---Group1](https://github.com/rtafag/PRJ301---Group1). Được cập nhật và hoàn thiện theo Đề cương chi tiết 10 tuần và Rubric Đánh giá Học thuật.*

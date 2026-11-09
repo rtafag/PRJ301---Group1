@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { parse } from 'csv-parse/sync';
-import { analyzeJavaSource, sha256 } from '../src/ai-engine.js';
+import { analyzeJavaSource, sha256, extractSlicedContext, buildPromptPayload } from '../src/ai-engine.js';
 import { createAuth } from '../src/auth.js';
 import { createStore } from '../src/store.js';
 
@@ -174,4 +174,48 @@ ${'    total += 1;\n'.repeat(42)}    return total;
   assert.ok(result.violations.some((finding) => finding.ruleCode === 'LONG_METHOD' && finding.lineNumber === 2));
   assert.ok(result.violations.some((finding) => finding.ruleCode === 'DUPLICATE_CODE' && finding.lineNumber > 2));
   assert.ok(result.totalScore < 10);
+});
+
+test('context slicing extracts only 5 lines around the violation and does not send raw whole file', () => {
+  const longSource = [
+    'public class BigFile {',
+    ...Array.from({ length: 50 }, (_, i) => `  // unrelated line ${i + 1}`),
+    '  public void buggy() {',
+    '    int x = 10 / 0;',
+    '  }',
+    ...Array.from({ length: 50 }, (_, i) => `  // trailing line ${i + 1}`),
+    '}'
+  ].join('\n');
+
+  const findings = [{
+    ruleCode: 'DIV_ZERO',
+    ruleName: 'Division by zero',
+    lineNumber: 53,
+    suggestedFix: 'Avoid dividing by constant zero.'
+  }];
+
+  const sliced = extractSlicedContext(longSource, findings);
+  assert.ok(sliced.includes('>> 53:     int x = 10 / 0;'));
+  assert.ok(sliced.includes('51:'));
+  assert.ok(sliced.includes('55:'));
+  // Must NOT include lines far away like line 5 or line 90
+  assert.ok(!sliced.includes('unrelated line 5\n'));
+  assert.ok(!sliced.includes('trailing line 45\n'));
+  assert.ok(sliced.length < longSource.length * 0.2, 'Sliced context should be less than 20% of original file length');
+});
+
+test('buildPromptPayload formats prompt with context slicing and anti-hallucination structure', () => {
+  const source = 'public class Test {\n  void f() {\n    String a = "hi";\n    if (a == "hi") {}\n  }\n}';
+  const findings = [{
+    ruleCode: 'STR_EQ',
+    ruleName: 'String comparison',
+    lineNumber: 4,
+    suggestedFix: 'Use .equals() instead of == for String comparison.'
+  }];
+
+  const payload = buildPromptPayload(source, findings);
+  assert.ok(payload.includes('Context Slicing'));
+  assert.ok(payload.includes('[STR_EQ]'));
+  assert.ok(payload.includes('Dòng 4'));
+  assert.ok(payload.includes('>> 4:     if (a == "hi") {}'));
 });
