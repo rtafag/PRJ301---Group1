@@ -101,6 +101,14 @@ test('store sends changed runtime data to its configured persistence adapter', a
   assert.equal(savedSnapshots[0].profileOverrides.HE001.fullName, 'Updated Student');
 });
 
+test('store loads seeded rules including NPE', () => {
+  const store = createStore({ runtimeData: {} });
+  const rules = store.listRules();
+
+  assert.ok(rules.length > 0);
+  assert.ok(rules.some((rule) => rule.ruleCode === 'NPE'));
+});
+
 test('course students are evenly split among assigned teachers', () => {
   const store = createStore();
   const teachers = parse(readFileSync(new URL('../../data/teachers.csv', import.meta.url), 'utf8'), {
