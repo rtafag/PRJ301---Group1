@@ -3,6 +3,7 @@ package com.group1.controller;
 import java.io.IOException;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
+import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
@@ -15,10 +16,19 @@ public class LogoutController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws ServletException, IOException {
+        // Clear JWT cookie
+        Cookie jwtCookie = new Cookie("jwt_token", "");
+        jwtCookie.setHttpOnly(true);
+        jwtCookie.setPath("/");
+        jwtCookie.setMaxAge(0);
+        response.addCookie(jwtCookie);
+
+        // Invalidate session
         HttpSession session = request.getSession(false);
         if (session != null) {
             session.invalidate();
         }
+
         response.sendRedirect(request.getContextPath() + "/login");
     }
 
