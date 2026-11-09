@@ -290,6 +290,8 @@ Nhóm cam kết tuân thủ các nguyên tắc kỷ luật học thuật sau đ�
 * **Containerization:** Docker Desktop.
 * **IDE:** IntelliJ IDEA / Eclipse / VS Code kèm Java Extension Pack.
 
+Hướng dẫn build image và chạy Java Sandbox trên Docker Desktop (Windows): [portal-node/README.md — Sandbox](portal-node/README.md#sandbox).
+
 ### 8.2. Cấu trúc Dự án Hiện tại
 ```text
 PRJ301---Group1/
@@ -340,7 +342,8 @@ PRJ301---Group1/
 │   └── controller/               # Test tích hợp Servlet E2E (TV5)
 │       └── SubmissionServletE2ETest.java
 ├── docs/
-│   └── FALSE_POSITIVE_REPORT.md  # Báo cáo kỹ thuật chi tiết đo lường False Positive (TV3)
+│   ├── FINAL_REPORT_TV5.md      # Báo cáo kỹ thuật cuối kỳ và QA/DevOps (TV5)
+│   └── FALSE_POSITIVE_REPORT.md # Báo cáo kỹ thuật chi tiết đo lường False Positive (TV3)
 ├── portal-node/                  # Cổng nộp bài Web Portal (Node/Express)
 ├── pom.xml                       # Quản lý dependencies (javaparser-core, mssql-jdbc, junit...)
 └── README.md                     # Tài liệu kiến trúc dự án & timeline
@@ -380,7 +383,7 @@ Chạy kiểm thử tích hợp HTTP cho luồng Servlet nộp ZIP:
 mvn --batch-mode test
 ```
 
-`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart tới `SubmissionController`, kiểm tra yêu cầu session, SHA-256, lưu bài và chặn bài trùng.
+`SubmissionServletE2ETest` khởi chạy embedded Jetty, gửi request multipart qua `Sha256Filter` tới `SubmissionController`, rồi kiểm tra xác thực session, SHA-256, lưu nguyên byte của ZIP, chặn bài trùng và từ chối phần mở rộng/đường dẫn ZIP không an toàn.
 
 ### 8.5. Kiểm thử JUnit 4 cho 15 AST Rules, Đo lường False Positive & Diễn giải AI (TV3)
 TV3 đã chuẩn hóa toàn bộ kiểm thử sang **JUnit 4** (29 test cases) và công bố số liệu kiểm thử thực nghiệm:

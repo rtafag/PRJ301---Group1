@@ -144,7 +144,7 @@ app.use(express.static(path.join(portalDirectory, 'public')));
 
 function publicSubmission(submission) {
   const { sourceCode, fileData, ...visible } = submission;
-  return visible;
+  return { ...visible, hasSourceCode: typeof sourceCode === 'string' && sourceCode.length > 0 };
 }
 
 function isJavaFile(fileName) {

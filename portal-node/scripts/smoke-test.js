@@ -30,17 +30,40 @@ async function waitForAnalysis(submissionId, authorization) {
   assert.fail('Timed out waiting for Redis-backed analysis to complete.');
 }
 
+const healthResponse = await fetch(`${baseUrl}/api/health`);
+assert.equal(healthResponse.status, 200, 'Portal health check failed');
+const health = await healthResponse.json();
+
 const student = await login('dungdang442', 'hash_dungdang442', 'Student');
 const classReportAttempt = await fetch(`${baseUrl}/api/teacher/report`, {
   headers: { Authorization: `Bearer ${student.token}` }
 });
 assert.equal(classReportAttempt.status, 403, 'Student must not access teacher reports');
 
+const teacher = await login('sondang619', 'hash_sondang619', 'Teacher');
+const teacherAuthorization = 'Bearer ' + teacher.token;
+const ruleResponse = await fetch(`${baseUrl}/api/teacher/rules`, {
+  headers: { Authorization: teacherAuthorization }
+});
+assert.equal(ruleResponse.status, 200, 'Teacher rule list failed');
+const { rules } = await ruleResponse.json();
+assert.ok(rules.some((rule) => rule.ruleCode === 'NPE'), 'NPE rule should be configured');
+const npeRule = rules.find((rule) => rule.ruleCode === 'NPE');
+if (!npeRule.enabled) {
+  const enableRuleResponse = await fetch(`${baseUrl}/api/teacher/rules/NPE`, {
+    method: 'PATCH',
+    headers: { Authorization: teacherAuthorization, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ enabled: true })
+  });
+  assert.equal(enableRuleResponse.status, 200, 'Teacher should be able to enable the NPE rule');
+  assert.equal((await enableRuleResponse.json()).rule.enabled, true);
+}
+
 const className = `PortalSmoke${Date.now()}`;
 const form = new FormData();
 form.append(
   'sourceFile',
-  new Blob([`public class ${className} { public Object value() { return null; } }`]),
+  new Blob([`public class ${className} { public static void main(String[] args) { System.out.println("AITA sandbox OK"); } public Object value() { return null; } }`]),
   `${className}.java`
 );
 const uploadResponse = await fetch(`${baseUrl}/api/student/submissions`, {
@@ -50,12 +73,33 @@ const uploadResponse = await fetch(`${baseUrl}/api/student/submissions`, {
 });
 assert.equal(uploadResponse.status, 201, 'Student upload failed');
 const { submission: queuedSubmission } = await uploadResponse.json();
+assert.equal(queuedSubmission.hasSourceCode, true, 'Submission metadata should expose code availability');
+assert.equal(Object.hasOwn(queuedSubmission, 'sourceCode'), false, 'Submission API must not expose submitted source text');
 assert.notEqual(queuedSubmission.status, 'Queue Failed', 'Java submission should enter the analysis queue');
 const submission = await waitForAnalysis(queuedSubmission.submissionId, `Bearer ${student.token}`);
 assert.equal(submission.analysis.syntaxValid, true);
-assert.equal(submission.analysis.violations[0].ruleCode, 'NPE');
+assert.ok(
+  submission.analysis.violations.some((violation) => violation.ruleCode === 'NPE'),
+  'Persisted analysis should include the configured NPE finding'
+);
+assert.equal(submission.hasSourceCode, true);
 
-const teacher = await login('sondang619', 'hash_sondang619', 'Teacher');
+const sandboxAuthorization = 'Bearer ' + student.token;
+const sandboxResponse = await fetch(`${baseUrl}/api/student/submissions/${submission.submissionId}/run`, {
+  method: 'POST',
+  headers: { Authorization: sandboxAuthorization }
+});
+assert.equal(sandboxResponse.status, 200, 'Student should be able to request sandbox execution for their Java submission');
+const { sandbox } = await sandboxResponse.json();
+if (health.sandboxEnabled) {
+  assert.equal(sandbox.available, true, sandbox.message || 'Enabled sandbox should be available');
+  assert.equal(sandbox.exitCode, 0, sandbox.stderr);
+  assert.match(sandbox.stdout, /AITA sandbox OK/);
+} else {
+  assert.equal(sandbox.available, false, 'Sandbox should report disabled when it is not enabled');
+  assert.match(sandbox.message, /disabled/i);
+}
+
 const coursesResponse = await fetch(`${baseUrl}/api/teacher/courses`, {
   headers: { Authorization: `Bearer ${teacher.token}` }
 });

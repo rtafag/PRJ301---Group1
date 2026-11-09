@@ -12,6 +12,8 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.Connection;
@@ -22,18 +24,22 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 import javax.servlet.MultipartConfigElement;
 import javax.servlet.ServletException;
+import javax.servlet.DispatcherType;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
 import org.eclipse.jetty.servlet.ServletContextHandler;
+import org.eclipse.jetty.servlet.FilterHolder;
 import org.eclipse.jetty.servlet.ServletHolder;
 import org.junit.After;
 import org.junit.Before;
@@ -60,6 +66,8 @@ public class SubmissionServletE2ETest {
                 11L * 1024 * 1024,
                 11L * 1024 * 1024,
                 1024 * 1024));
+        context.addFilter(new FilterHolder(new Sha256Filter()), "/student/submissions",
+                EnumSet.of(DispatcherType.REQUEST));
         context.addServlet(new ServletHolder(new TestLoginServlet()), "/test-login");
 
         server.setHandler(context);
@@ -74,10 +82,13 @@ public class SubmissionServletE2ETest {
             server.stop();
             server.join();
         }
+        for (String filePath : database.savedFiles()) {
+            Files.deleteIfExists(Paths.get(filePath));
+        }
     }
 
     @Test
-    public void submissionServletHashesAndRejectsDuplicateZipUploads() throws Exception {
+    public void submissionServletHashesPersistsAndRejectsDuplicateZipUploads() throws Exception {
         byte[] zip = createZip();
         String cookie = loginAndGetSessionCookie();
 
@@ -89,9 +100,22 @@ public class SubmissionServletE2ETest {
         String expectedHash = hex(MessageDigest.getInstance("SHA-256").digest(zip));
         assertTrue(accepted.body.contains("\"sha256\":\"" + expectedHash + "\""));
         assertTrue(database.containsHash(expectedHash));
+        assertTrue(java.util.Arrays.equals(zip, Files.readAllBytes(Paths.get(database.filePath(expectedHash)))));
 
         HttpResult duplicate = upload(zip, cookie);
         assertEquals(HttpServletResponse.SC_CONFLICT, duplicate.status);
+    }
+
+    @Test
+    public void submissionServletRejectsUnsafeArchivesAndNonZipFiles() throws Exception {
+        String cookie = loginAndGetSessionCookie();
+
+        HttpResult wrongExtension = upload(createZip(), cookie, "project.jar");
+        assertEquals(HttpServletResponse.SC_BAD_REQUEST, wrongExtension.status);
+
+        HttpResult unsafeArchive = upload(createZip("../outside.txt"), cookie, "project.zip");
+        assertEquals(HttpServletResponse.SC_BAD_REQUEST, unsafeArchive.status);
+        assertTrue(database.savedFiles().isEmpty());
     }
 
     private String loginAndGetSessionCookie() throws IOException {
@@ -107,9 +131,13 @@ public class SubmissionServletE2ETest {
     }
 
     private HttpResult upload(byte[] zip, String cookie) throws IOException {
+        return upload(zip, cookie, "project.zip");
+    }
+
+    private HttpResult upload(byte[] zip, String cookie, String fileName) throws IOException {
         ByteArrayOutputStream body = new ByteArrayOutputStream();
         write(body, "--" + BOUNDARY + "\r\n");
-        write(body, "Content-Disposition: form-data; name=\"submissionFile\"; filename=\"project.zip\"\r\n");
+        write(body, "Content-Disposition: form-data; name=\"submissionFile\"; filename=\"" + fileName + "\"\r\n");
         write(body, "Content-Type: application/zip\r\n\r\n");
         body.write(zip);
         write(body, "\r\n--" + BOUNDARY + "--\r\n");
@@ -136,9 +164,13 @@ public class SubmissionServletE2ETest {
     }
 
     private static byte[] createZip() throws IOException {
+        return createZip("src/Main.java");
+    }
+
+    private static byte[] createZip(String entryName) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         try (ZipOutputStream zip = new ZipOutputStream(output)) {
-            zip.putNextEntry(new ZipEntry("src/Main.java"));
+            zip.putNextEntry(new ZipEntry(entryName));
             zip.write("class Main { public static void main(String[] args) {} }"
                     .getBytes(StandardCharsets.UTF_8));
             zip.closeEntry();
@@ -208,6 +240,18 @@ public class SubmissionServletE2ETest {
 
         private synchronized boolean containsHash(String hash) {
             return rowsByHash.containsKey(hash);
+        }
+
+        private synchronized String filePath(String hash) {
+            return (String) rowsByHash.get(hash).get("file_url");
+        }
+
+        private synchronized Collection<String> savedFiles() {
+            Collection<String> paths = new java.util.ArrayList<>();
+            for (Map<String, Object> row : rowsByHash.values()) {
+                paths.add((String) row.get("file_url"));
+            }
+            return paths;
         }
 
         private Connection openConnection() {
