@@ -7,14 +7,18 @@ function hashPassword(password) {
 }
 
 function matchesPasswordHash(candidate, expected) {
-  if (String(expected).startsWith('$scrypt$')) {
-    const [, , salt, digest] = String(expected).split('$');
+  const storedPassword = String(expected);
+  if (storedPassword.startsWith('$scrypt$')) {
+    const [, , salt, digest] = storedPassword.split('$');
     if (!salt || !digest) return false;
     const actual = scryptSync(String(candidate), salt, Buffer.from(digest, 'hex').length);
     return timingSafeEqual(actual, Buffer.from(digest, 'hex'));
   }
+
   const candidateDigest = createHash('sha256').update(String(candidate)).digest();
-  const expectedDigest = createHash('sha256').update(String(expected)).digest();
+  const expectedDigest = /^[a-f\d]{64}$/i.test(storedPassword)
+    ? Buffer.from(storedPassword, 'hex')
+    : createHash('sha256').update(storedPassword).digest();
   return timingSafeEqual(candidateDigest, expectedDigest);
 }
 
