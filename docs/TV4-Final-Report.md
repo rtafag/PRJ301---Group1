@@ -1,7 +1,7 @@
 # Báo cáo hoàn thiện TV4 - Submission Portal và Dashboard AST
 
-**Dự án:** AITA - PRJ301, Nhóm 1  
-**Phạm vi:** UI/MVC2 Servlet/JSP, bảo vệ luồng nộp bài, dashboard kết quả AST, tài liệu demo  
+**Dự án:** AITA - PRJ301, Nhóm 1
+**Phạm vi:** UI/MVC2 Servlet/JSP, bảo vệ luồng nộp bài, dashboard kết quả AST, tài liệu demo
 **Cập nhật:** 09/11/2026
 
 ## 1. Tóm tắt
