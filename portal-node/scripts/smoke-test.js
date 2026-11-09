@@ -11,7 +11,10 @@ async function login(username, passwordHash, role) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ username, passwordHash, role })
   });
-  assert.equal(response.status, 200, `${role} login failed`);
+  if (response.status !== 200) {
+    const body = await response.text();
+    assert.fail(`${role} login failed for "${username}": HTTP ${response.status} ${body}`);
+  }
   return response.json();
 }
 
