@@ -44,6 +44,16 @@ jobs:
       - name: Run Node tests
         working-directory: portal-node
         run: npm test
+      - name: Diagnose portal data before start
+        run: |
+          echo "--- users.csv checksum and demo account"
+          sha256sum data/users.csv
+          grep -m1 "dungdang442" data/users.csv | cut -d, -f1-3
+          echo "--- expected sha256(password123)"
+          printf 'password123' | sha256sum
+          echo "--- runtime state files left by earlier steps"
+          ls -la portal-node/storage 2>/dev/null || echo "no portal-node/storage"
+          git status --short | head -20
       - name: Start submission portal
         working-directory: portal-node
         run: |
