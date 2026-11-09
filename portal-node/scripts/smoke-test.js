@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs';
 import { parse } from 'csv-parse/sync';
 
 const baseUrl = process.env.PORTAL_URL || 'http://localhost:3000';
+const demoPassword = 'password123';
 
 async function login(username, passwordHash, role) {
   const response = await fetch(`${baseUrl}/api/auth/login`, {
@@ -34,13 +35,13 @@ const healthResponse = await fetch(`${baseUrl}/api/health`);
 assert.equal(healthResponse.status, 200, 'Portal health check failed');
 const health = await healthResponse.json();
 
-const student = await login('dungdang442', 'hash_dungdang442', 'Student');
+const student = await login('dungdang442', demoPassword, 'Student');
 const classReportAttempt = await fetch(`${baseUrl}/api/teacher/report`, {
   headers: { Authorization: `Bearer ${student.token}` }
 });
 assert.equal(classReportAttempt.status, 403, 'Student must not access teacher reports');
 
-const teacher = await login('sondang619', 'hash_sondang619', 'Teacher');
+const teacher = await login('sondang619', demoPassword, 'Teacher');
 const teacherAuthorization = 'Bearer ' + teacher.token;
 const ruleResponse = await fetch(`${baseUrl}/api/teacher/rules`, {
   headers: { Authorization: teacherAuthorization }
@@ -174,7 +175,7 @@ assert.ok(firstCourseGrades.length > 0, 'Fall 2026 should contain course grades'
 assert.ok(firstCourseGrades.every((grade) => grade.active), 'All students should be active');
 assert.equal(firstCourse.courseCode, 'JPE255', 'The first mapped teacher should teach JPE255');
 
-const academicStudent = await login('dungdang442', 'hash_dungdang442', 'Student');
+const academicStudent = await login('dungdang442', demoPassword, 'Student');
 const studentCourseGradesResponse = await fetch(`${baseUrl}/api/student/course-grades`, {
   headers: { Authorization: `Bearer ${academicStudent.token}` }
 });
@@ -226,7 +227,7 @@ const courseFeedbackGradesResponse = await fetch(`${baseUrl}/api/teacher/course-
 });
 const { grades: courseFeedbackGrades } = await courseFeedbackGradesResponse.json();
 assert.equal(courseFeedbackGrades.find((grade) => grade.studentId === savedGrade.studentId).manualFeedback, 'Smoke test feedback.');
-const feedbackStudent = await login('dungdang442', 'hash_dungdang442', 'Student');
+const feedbackStudent = await login('dungdang442', demoPassword, 'Student');
 const feedbackStudentGradesResponse = await fetch(`${baseUrl}/api/student/course-grades`, {
   headers: { Authorization: `Bearer ${feedbackStudent.token}` }
 });
@@ -480,13 +481,13 @@ const restoreProfileResponse = await fetch(`${baseUrl}/api/me/profile`, {
 assert.equal(restoreProfileResponse.status, 200, 'Profile changes should be reversible');
 const changePasswordResponse = await fetch(`${baseUrl}/api/me/password`, {
   method: 'PATCH', headers: { Authorization: `Bearer ${academicStudent.token}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ currentPassword: 'hash_dungdang442', newPassword: 'PortalSmokePass2026!' })
+  body: JSON.stringify({ currentPassword: demoPassword, newPassword: 'PortalSmokePass2026!' })
 });
 assert.equal(changePasswordResponse.status, 200, 'User should change password after verifying current password');
 const changedPasswordLogin = await login('dungdang442', 'PortalSmokePass2026!', 'Student');
 const restorePasswordResponse = await fetch(`${baseUrl}/api/me/password`, {
   method: 'PATCH', headers: { Authorization: `Bearer ${changedPasswordLogin.token}`, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ currentPassword: 'PortalSmokePass2026!', newPassword: 'hash_dungdang442' })
+  body: JSON.stringify({ currentPassword: 'PortalSmokePass2026!', newPassword: demoPassword })
 });
 assert.equal(restorePasswordResponse.status, 200, 'Password should be restorable after the password test');
 

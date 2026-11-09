@@ -17,7 +17,7 @@ Copy-Item .env.example .env
 npm.cmd start
 ```
 
-Open `http://localhost:3000`. User IDs run from `GV0001` for teachers and `HE001` for students. Usernames use each roster email's local part, and demo passwords use `hash_<username>`; duplicate email local parts include the lower-case user ID as a suffix. These are sample credentials, not production password hashes.
+Open `http://localhost:3000`. User IDs run from `GV0001` for teachers and `HE001` for students. Usernames use each roster email's local part, and seeded demo accounts use `password123`; duplicate email local parts include the lower-case user ID as a suffix. These are sample credentials, not production passwords.
 
 ## Password recovery
 
