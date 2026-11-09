@@ -7,7 +7,7 @@ ruleId,ruleCode,ruleName,severity,penaltyPoints,description
 6,MISSING_OVERRIDE,MissingOverride,Low,1.0,Subtype method overrides superclass/interface without @Override annotation
 7,EQUALS_HASHCODE,EqualsWithoutHashCode,Medium,1.5,Class overrides equals() without overriding hashCode()
 8,DUPLICATE_CODE,DuplicateCode,Medium,1.5,Extract repeated method bodies into shared helper method
-9,RES_LEAK,ResourceLeak,Critical,2.5,JDBC Connection, Statement, or ResultSet not closed safely
+9,RES_LEAK,ResourceLeak,Critical,2.5,"JDBC Connection, Statement, or ResultSet not closed safely"
 10,EMPTY_CATCH,EmptyCatchBlock,Medium,1.5,Catch block catches exception but does nothing (swallowing errors)
 11,NPE,NullPointerException,High,2.0,Avoid returning null directly without checks
 12,OOM,OutOfMemoryError,Critical,5.0,Memory leak detected from repeated object/array allocation in loop
