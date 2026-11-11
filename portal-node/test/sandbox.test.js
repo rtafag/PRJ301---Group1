@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
+import { statSync } from 'node:fs';
 import path from 'node:path';
 import { PassThrough } from 'node:stream';
 import { access } from 'node:fs/promises';
@@ -89,6 +90,7 @@ test('sandbox compiles multiple Java files with isolation limits and a read-only
   setSandboxEnabled(context);
   const calls = [];
   let temporarySources;
+  let temporaryDirectoryMode;
   const result = await runJavaInSandbox(
     [
       { fileName: 'Demo.java', sourceCode: 'package demo; public class Demo { public static void main(String[] args) {} }' },
@@ -100,6 +102,7 @@ test('sandbox compiles multiple Java files with isolation limits and a read-only
         calls.push({ command, args, options });
         const mount = args.find((argument) => argument.startsWith('type=bind,source='));
         const directory = mount.slice('type=bind,source='.length).split(',target=')[0];
+        temporaryDirectoryMode = statSync(directory).mode & 0o777;
         temporarySources = ['Demo.java', 'Helper.java'].map((fileName) => path.join(directory, fileName));
         return createChild({ code: 0, stdout: 'Sandbox passed.\n' });
       }
@@ -108,6 +111,9 @@ test('sandbox compiles multiple Java files with isolation limits and a read-only
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].command, 'docker');
+  if (process.platform !== 'win32') {
+    assert.equal(temporaryDirectoryMode, 0o755, 'Docker user must be able to traverse the mounted source directory.');
+  }
   assert.deepEqual(calls[0].args.slice(0, 4), ['run', '--rm', '--pull=never', '--network=none']);
   assert.ok(calls[0].args.includes('--memory=128m'));
   assert.ok(calls[0].args.includes('--cpus=0.5'));

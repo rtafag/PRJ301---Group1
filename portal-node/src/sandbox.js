@@ -56,6 +56,7 @@ export async function runJavaInSandbox(sourceFiles, mainFileName, { spawnProcess
   ];
 
   try {
+    await fs.chmod(temporaryDirectory, 0o755);
     for (const file of sourceFiles) {
       await fs.writeFile(path.join(temporaryDirectory, file.fileName), file.sourceCode, { encoding: 'utf8', mode: 0o444 });
     }
