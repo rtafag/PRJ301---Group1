@@ -25,11 +25,15 @@ const analysisQueue = new AnalysisQueue();
 const auth = createAuth(store);
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 512 * 1024, files: 1 }
+  limits: { fileSize: 512 * 1024, files: 20, fields: 10, parts: 30 }
 });
 const studentOnly = requireAuth(auth, 'Student');
 const teacherOnly = requireAuth(auth, 'Teacher');
 let workerRunning = true;
+
+function sandboxEnabled() {
+  return (process.env.SANDBOX_ENABLED ?? 'true').toLowerCase() !== 'false';
+}
 
 async function processAnalysisJob(job) {
   const submission = store.findSubmission(job.submissionId);
@@ -143,8 +147,16 @@ app.use(express.json({ limit: '64kb' }));
 app.use(express.static(path.join(portalDirectory, 'public')));
 
 function publicSubmission(submission) {
-  const { sourceCode, fileData, ...visible } = submission;
-  return { ...visible, hasSourceCode: typeof sourceCode === 'string' && sourceCode.length > 0 };
+  const { sourceCode, fileData, sourceFiles, ...visible } = submission;
+  return {
+    ...visible,
+    fileNames: Array.isArray(sourceFiles) && sourceFiles.length
+      ? sourceFiles.map((file) => file.fileName)
+      : [submission.fileName],
+    hasSourceCode: typeof sourceCode === 'string' && sourceCode.length > 0,
+    hasJavaSource: (Array.isArray(sourceFiles) && sourceFiles.length > 0)
+      || (isJavaFile(submission.fileName) && typeof sourceCode === 'string' && sourceCode.length > 0)
+  };
 }
 
 function isJavaFile(fileName) {
@@ -188,7 +200,7 @@ app.get('/api/health', async (request, response) => {
     status: queueStatus === 'ready' ? 'ok' : 'degraded',
     analysisQueue: queueStatus,
     aiProvider: process.env.AI_PROVIDER || 'disabled',
-    sandboxEnabled: process.env.SANDBOX_ENABLED === 'true',
+    sandboxEnabled: sandboxEnabled(),
     storage: sqlRepository ? 'sqlserver' : 'json'
   });
 });
@@ -262,25 +274,64 @@ app.patch('/api/me/notifications/:notificationId/read', requireAuth(auth), async
 });
 
 app.post('/api/student/submissions', studentOnly, (request, response, next) => {
-  upload.single('sourceFile')(request, response, async (error) => {
+  upload.array('sourceFile', 20)(request, response, async (error) => {
     if (error) return next(error);
-    if (!request.file) return response.status(400).json({ error: 'Choose a file to submit.' });
+    const uploadedFiles = request.files ?? [];
+    if (!uploadedFiles.length) return response.status(400).json({ error: 'Choose at least one file to submit.' });
 
-    const fileName = path.basename(request.file.originalname);
-    if (!fileName || fileName.length > 255 || /[\u0000-\u001f]/.test(fileName)) {
-      return response.status(400).json({ error: 'File name is invalid or exceeds 255 characters.' });
+    const files = uploadedFiles.map((file) => ({
+      ...file,
+      fileName: path.basename(String(file.originalname).replaceAll('\\', '/'))
+    }));
+    if (files.some((file) => !file.fileName || file.fileName.length > 255 || /[\u0000-\u001f]/.test(file.fileName))) {
+      return response.status(400).json({ error: 'A file name is invalid or exceeds 255 characters.' });
+    }
+    if (files.length > 1 && files.some((file) => !isJavaFile(file.fileName))) {
+      return response.status(415).json({ error: 'Multiple-file submissions must contain only .java files.' });
+    }
+    const totalBytes = files.reduce((total, file) => total + file.size, 0);
+    if (totalBytes > 512 * 1024) {
+      return response.status(413).json({ error: 'Combined submission size must be 512 KB or smaller.' });
     }
 
+    const names = files.map((file) => file.fileName.toLowerCase());
+    if (new Set(names).size !== names.length) {
+      return response.status(400).json({ error: 'Submitted files must have unique filenames.' });
+    }
+
+    const mainFileName = String(request.body?.mainFile ?? files[0].fileName);
+    const mainFile = files.find((file) => file.fileName === mainFileName);
+    if (!mainFile) {
+      return response.status(400).json({ error: 'Choose an entry-point file from the selected Java files.' });
+    }
+
+    if (files.length > 1 && files.some((file) => !/^[A-Za-z_$][A-Za-z0-9_$]*\.java$/i.test(file.fileName))) {
+      return response.status(400).json({ error: 'Java filenames must be valid class names ending in .java.' });
+    }
+
+    const fileName = mainFile.fileName;
     const javaFile = isJavaFile(fileName);
-    const mimeType = request.file.mimetype || 'application/octet-stream';
-    const sourceCode = isTextFile(fileName, mimeType) ? request.file.buffer.toString('utf8') : null;
+    const mimeType = mainFile.mimetype || 'application/octet-stream';
+    const sourceCode = isTextFile(fileName, mimeType) ? mainFile.buffer.toString('utf8') : null;
+    const sourceFiles = files.every((file) => isJavaFile(file.fileName))
+      ? files.map((file) => ({ fileName: file.fileName, sourceCode: file.buffer.toString('utf8') }))
+      : null;
     const assignmentId = String(request.body?.assignmentId ?? '').trim();
     const assignment = assignmentId
       ? store.listAssignmentsForStudent(request.user.userId).find((item) => item.assignmentId === assignmentId)
       : null;
     if (assignmentId && !assignment) return response.status(404).json({ error: 'Assignment not found for your courses.' });
     if (assignment?.closed) return response.status(409).json({ error: 'This assignment is closed and no longer accepts submissions.' });
-    const fileHash = crypto.createHash('sha256').update(request.file.buffer).digest('hex');
+    const hash = crypto.createHash('sha256');
+    if (files.length === 1) {
+      hash.update(mainFile.buffer);
+    } else {
+      for (const file of [...files].sort((first, second) => first.fileName.localeCompare(second.fileName))) {
+        hash.update(`${Buffer.byteLength(file.fileName)}:${file.fileName}:${file.size}:`);
+        hash.update(file.buffer);
+      }
+    }
+    const fileHash = hash.digest('hex');
     const duplicate = store.findSubmissionByHash(fileHash);
     if (duplicate) {
       const message = duplicate.userId === request.user.userId
@@ -295,11 +346,14 @@ app.post('/api/student/submissions', studentOnly, (request, response, next) => {
       userId: request.user.userId,
       assignmentId: assignment?.assignmentId ?? null,
       fileName,
+      mainFileName: fileName,
+      fileNames: files.map((file) => file.fileName),
       mimeType,
-      fileData: request.file.buffer.toString('base64'),
+      fileData: mainFile.buffer.toString('base64'),
       fileUrl: `local://${request.user.userId}/${fileName}`,
       fileHash,
       sourceCode,
+      sourceFiles,
       status: javaFile ? 'Queued' : 'Submitted',
       score: null,
       analysis: null,
@@ -400,11 +454,16 @@ app.post('/api/student/submissions/:submissionId/run', studentOnly, async (reque
   if (!isJavaFile(submission.fileName)) {
     return response.status(415).json({ error: 'The Java sandbox only accepts .java submissions.' });
   }
-  if (!submission.sourceCode) {
+  const sourceFiles = Array.isArray(submission.sourceFiles) && submission.sourceFiles.length
+    ? submission.sourceFiles
+    : submission.sourceCode
+      ? [{ fileName: submission.fileName, sourceCode: submission.sourceCode }]
+      : [];
+  if (!sourceFiles.length) {
     return response.status(409).json({ error: 'Source code is not available for this sample submission.' });
   }
   try {
-    const result = await runJavaInSandbox(submission.sourceCode, submission.fileName);
+    const result = await runJavaInSandbox(sourceFiles, submission.mainFileName ?? submission.fileName);
     return response.json({ sandbox: result });
   } catch (error) {
     return next(error);
@@ -774,7 +833,12 @@ app.patch('/api/teacher/submissions/:submissionId/feedback', teacherOnly, async 
 app.use((error, request, response, next) => {
   if (response.headersSent) return next(error);
   if (error instanceof multer.MulterError) {
-    return response.status(400).json({ error: error.code === 'LIMIT_FILE_SIZE' ? 'File must be 512 KB or smaller.' : 'Upload one file at a time.' });
+    const message = error.code === 'LIMIT_FILE_SIZE'
+      ? 'Each file must be 512 KB or smaller.'
+      : error.code === 'LIMIT_FILE_COUNT'
+        ? 'Submit no more than 20 files at once.'
+        : 'The submission contains too many form fields or files.';
+    return response.status(400).json({ error: message });
   }
   console.error(error);
   return response.status(500).json({ error: 'An unexpected server error occurred.' });

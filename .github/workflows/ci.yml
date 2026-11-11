@@ -44,6 +44,8 @@ jobs:
       - name: Run Node tests
         working-directory: portal-node
         run: npm test
+      - name: Build Java sandbox image
+        run: docker build -t aita-java-sandbox:8 -f docker/sandbox/Dockerfile docker/sandbox
       - name: Start submission portal
         working-directory: portal-node
         run: |

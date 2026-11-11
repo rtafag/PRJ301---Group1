@@ -3,7 +3,7 @@
 **Môn học:** PRJ301
 **Nhóm:** Group 1
 **Phân công:** TV5 — Integration & QA/DevOps Engineer
-**Ngày lập:** 09/11/2026
+**Ngày lập:** 11/11/2026
 **Phạm vi:** Kiến trúc và chức năng hiện có trong repository, tập trung vào tích hợp, kiểm thử, CI, Redis, SHA-256 và sandbox.
 
 ---
@@ -95,15 +95,15 @@ Giới hạn hiện có: ZIP tối đa 10 MiB khi upload, tối đa 1.000 entry 
 
 ### 4.4. Docker sandbox
 
-Sandbox là chức năng tùy chọn **chỉ dành cho Node.js portal**, không tự động chạy các ZIP được nộp qua Java Servlet/JDBC. Tính năng mặc định tắt và chỉ hoạt động khi đặt `SANDBOX_ENABLED=true`, Docker daemon đang chạy và image `aita-java-sandbox:8` đã được build cục bộ. Image dùng Java 8 JDK, được định nghĩa tại `portal-node/sandbox/Dockerfile`; runner dùng `--pull=never` để tránh tải image trong lúc xử lý bài nộp.
+Sandbox chạy khi sinh viên chủ động yêu cầu từ **Node.js portal**, không tự động chạy lúc upload/phân tích và không áp dụng cho ZIP được nộp qua Java Servlet/JDBC. Tính năng mặc định bật; đặt `SANDBOX_ENABLED=false` để tắt. Docker daemon phải chạy và image `aita-java-sandbox:8` phải được build cục bộ. Image dùng Java 8 JDK, được định nghĩa tại `docker/sandbox/Dockerfile` ở thư mục gốc repository; runner dùng `--pull=never` để không tải image trong lúc xử lý bài.
 
-Sinh viên gửi yêu cầu qua `POST /api/student/submissions/:submissionId/run`. Server chỉ lấy source từ bài Java thuộc về sinh viên đã xác thực. API danh sách bài nộp chỉ trả metadata `hasSourceCode` để giao diện quyết định hiển thị nút chạy; source code không bị lộ trong response đó. Runner hiện hỗ trợ một tệp `.java`, class phải khớp tên tệp và chương trình cần có `main` method để chạy bình thường.
+Sinh viên có thể upload một file bất kỳ như trước, hoặc chọn nhiều file `.java` (tối đa 20 file, tổng dung lượng tối đa 512 KiB). Khi chọn nhiều file, UI yêu cầu chọn file entry point có `main`; các tên file phải duy nhất, khớp định danh class Java và kết thúc bằng `.java`. Server lưu cả nhóm file Java trên cùng submission; phân tích hiện tại vẫn dùng riêng entry point, còn sandbox biên dịch tất cả file rồi chạy class entry point. Yêu cầu chạy gọi `POST /api/student/submissions/:submissionId/run`; server chỉ lấy source từ bài nộp thuộc về sinh viên đã xác thực. API công khai chỉ trả danh sách tên file và metadata, không trả source code.
 
-Mỗi lần chạy dùng container riêng với `--network=none`, filesystem read-only, source mount chỉ đọc, capabilities bị loại bỏ, `no-new-privileges`, user không đặc quyền, giới hạn 128 MiB RAM, 0,5 CPU, 32 process, timeout 12 giây và output có giới hạn. Khi timeout, runner gọi `docker kill` trên container có tên riêng; source tạm trên host được dọn sau khi chạy.
+Mỗi lần chạy dùng container riêng với `--network=none`, filesystem read-only, source mount chỉ đọc, capabilities bị loại bỏ, `no-new-privileges`, user không đặc quyền, giới hạn 128 MiB RAM, 0,5 CPU, 32 process, timeout 12 giây và output có giới hạn. Khi timeout, runner gọi `docker kill` trên container có tên riêng; tất cả source tạm trên host được dọn sau khi chạy.
 
-Trước demo trên Windows, cần khởi động Docker Desktop ở chế độ Linux containers, xác nhận `docker info` thành công, build image và bật cấu hình sandbox trong `.env`. Cần có Redis để portal hoạt động. Các bước PowerShell chi tiết được ghi ở [portal-node/README.md](../portal-node/README.md#sandbox) và tóm tắt tại mục 6.4 bên dưới. Không nên đưa portal demo trực tiếp ra Internet.
+Trước demo trên Windows, cần khởi động Docker Desktop ở chế độ Linux containers, xác nhận `docker info` thành công, build image và bảo đảm `.env` không đặt `SANDBOX_ENABLED=false`. Cần có Redis để portal hoạt động. Các bước PowerShell chi tiết được ghi ở [portal-node/README.md](../portal-node/README.md#sandbox) và tóm tắt tại mục 6.4 bên dưới. Không nên đưa portal demo trực tiếp ra Internet.
 
-Kiểm thử hiện có mock Docker để xác minh lệnh chạy, flags cách ly và xử lý các tình huống thiếu image/daemon hoặc timeout. CI không chạy container sandbox thật. Vì vậy kết quả unit tests không chứng minh runtime isolation, bind mount hay giới hạn tài nguyên trên Docker host; các nội dung này vẫn cần được xác minh trên máy demo.
+Unit tests mock Docker để kiểm tra lệnh biên dịch nhiều file, flags cách ly, dọn source và xử lý lỗi/timeout. Đã build thành công image `aita-java-sandbox:8` trên Docker Desktop và chạy trực tiếp chương trình `Main.java` + `Helper.java` bằng Java 8 trong container với các giới hạn sandbox, nhận output `MULTI_FILE_OK`. Đây là kiểm tra Docker/compiler thực tế, nhưng chưa chạy qua API portal vì Node.js chưa có trên host. CI được cập nhật để build image rồi smoke test chạy chương trình nhiều file qua API; thay đổi này chưa được xác nhận bằng CI run mới.
 
 ## 5. Kiểm thử và CI
 
@@ -112,16 +112,16 @@ Kiểm thử hiện có mock Docker để xác minh lệnh chạy, flags cách l
 | Lớp kiểm thử | Kết quả | Phạm vi / giới hạn |
 |---|---:|---|
 | Java JUnit | **52 tests passed** | Chạy năm JUnit test classes từ cache cục bộ; bao gồm AST/rule tests và hai Servlet E2E qua embedded Jetty. |
-| Node.js unit tests | **21 passed, 1 skipped** | Node.js 22; 7 sandbox tests dùng mocked Docker và đều đạt. Redis integration bị skip vì máy local không có Redis đang chạy. |
+| Node.js unit tests | **24 passed, 2 skipped** | Chạy trong container Node.js 22; các skip là Redis integration và SQL Server integration do dịch vụ chưa chạy. |
 | Redis integration trong CI | Có bước kiểm thử | Workflow cung cấp Redis service để kiểm thử priority và retry; cần một CI run mới để xác nhận phiên bản code hiện tại. |
 | Smoke test qua HTTP | Có trong workflow | Bao gồm đăng nhập, phân quyền, nộp bài Java, đợi kết quả queue và một số luồng portal khác. Chưa xác nhận bằng CI run mới sau các chỉnh sửa local. |
-| Docker sandbox | **7 unit tests mocked passed**; runtime chưa nghiệm thu | Docker daemon không khả dụng trong môi trường kiểm thử; chưa build image hoặc chạy container thật; sandbox không bật mặc định. |
+| Docker sandbox | **Image build thành công; chạy trực tiếp 2 file Java trong container thành công** | Full portal API/CI chưa xác nhận. Workflow mới build image và chạy smoke test nhiều file sau khi push. |
 
 ### 5.2. Trạng thái CI
 
 Workflow `.github/workflows/ci.yml` chạy Maven tests, `npm ci`, Node tests, khởi động portal với Redis và chạy smoke test. Workflow dùng Node.js 22 để khớp yêu cầu engine của dependency.
 
-Run GitHub Actions gần nhất có thể đối chiếu tại thời điểm lập báo cáo là [CI run #11](https://github.com/rtafag/PRJ301---Group1/actions/runs/42551783229), trên commit `5699bb8`. Run đó **thất bại** trong smoke test vì test truy cập `violations[0]` và giả định finding đầu tiên luôn là `NPE`. Mã sửa assertion và các thay đổi test/workflow trong working tree hiện tại **chưa có CI run mới**; do đó báo cáo không kết luận CI đã xanh. Cần push commit chứa các thay đổi này để GitHub Actions chạy lại.
+CI trước đó đã có run lỗi do seed rule CSV không được parse, khiến smoke test không tìm thấy `NPE`. Sau khi sửa CSV và cập nhật workflow để build Docker image, các thay đổi mới nhất **chưa có CI run xác nhận**; cần push và kiểm tra workflow để kết luận CI xanh.
 
 ## 6. Hướng dẫn chạy và demo
 
@@ -176,8 +176,7 @@ Các lệnh sau chạy trong PowerShell. Trước tiên mở Docker Desktop, ch�
 Từ thư mục gốc repository:
 
 ```powershell
-cd portal-node
-docker build -t aita-java-sandbox:8 -f sandbox\Dockerfile sandbox
+docker build -t aita-java-sandbox:8 -f docker\sandbox\Dockerfile docker\sandbox
 docker image inspect aita-java-sandbox:8
 ```
 
@@ -187,7 +186,7 @@ Khởi động Redis nếu chưa có container:
 docker run -d --name aita-redis -p 6379:6379 redis:7-alpine
 ```
 
-Nếu container `aita-redis` đã được tạo nhưng đang dừng, dùng `docker start aita-redis`. Tạo `portal-node\.env` từ `.env.example` (nếu chưa có) và đặt:
+Nếu container `aita-redis` đã được tạo nhưng đang dừng, dùng `docker start aita-redis`. Tạo `portal-node\.env` từ `.env.example` (nếu chưa có); mặc định sandbox đã bật. Bảo đảm các giá trị:
 
 ```env
 REDIS_URL=redis://127.0.0.1:6379
@@ -195,20 +194,20 @@ SANDBOX_ENABLED=true
 SANDBOX_IMAGE=aita-java-sandbox:8
 ```
 
-Cần Node.js 22 trở lên. Trong `portal-node`, cài dependencies và khởi động ứng dụng:
+Cần Node.js 22 trở lên. Trong PowerShell, chuyển vào `portal-node`, cài dependencies và khởi động ứng dụng:
 
 ```powershell
 npm.cmd ci
 npm.cmd start
 ```
 
-Mở `http://localhost:3000`, đăng nhập tài khoản sinh viên demo, nộp một file `.java` có class trùng tên file và `main` method, sau đó vào **Analysis & fixes** và chọn **Run in sandbox**. Kết quả hiện dưới nút chạy. Sau demo, có thể dừng và xóa Redis container bằng `docker rm -f aita-redis`; image sandbox có thể giữ lại để dùng lần sau.
+Mở `http://localhost:3000`, đăng nhập tài khoản sinh viên demo, chọn một hoặc nhiều file `.java` (tối đa 20 file, tổng 512 KiB). Khi chọn nhiều file, chọn file entry point chứa `main`; sau khi nộp, vào **Analysis & fixes** và chọn **Run in sandbox**. Container biên dịch tất cả file đã nộp rồi chạy entry point. Nếu Docker daemon/image chưa sẵn sàng, API báo lỗi rõ ràng và không chạy Java trực tiếp trên host. Có thể đặt `SANDBOX_ENABLED=false` trong `.env` để tắt hẳn. Sau demo, dừng Redis bằng `docker rm -f aita-redis`; image sandbox có thể giữ để dùng lần sau.
 
 ## 7. Hạn chế và rủi ro còn lại
 
 1. **Hai luồng web chưa hợp nhất:** Servlet và Node portal dùng luồng xác thực, xử lý upload và persist khác nhau; portal mặc định lưu JSON.
 2. **Lưu SQL của portal chưa chuẩn hóa:** SQL adapter lưu snapshot JSON trong `PortalRuntimeState`; chưa thay thế các DAO nghiệp vụ trong luồng Servlet.
-3. **Sandbox chưa được kiểm thử runtime trong báo cáo này:** Chưa build image hoặc chạy container thật do Docker daemon không khả dụng trong môi trường kiểm thử. Unit tests dùng mock; cần kiểm tra Docker daemon/image, bind mount, timeout và giới hạn tài nguyên trên môi trường demo thật. Sandbox hiện chỉ tích hợp với Node.js portal, không với luồng ZIP của Java Servlet.
+3. **Sandbox API cần nghiệm thu:** Docker image và biên dịch/chạy nhiều file trong container đã được xác minh trực tiếp; CI được cấu hình build image và chạy multi-file smoke test qua API nhưng cần một CI run xanh. Sandbox chỉ tích hợp với Node.js portal, không với luồng ZIP Java Servlet; phân tích tĩnh hiện chỉ dùng file entry point.
 4. **CI chưa xanh được xác nhận cho thay đổi hiện tại:** Cần push các sửa đổi, xem workflow run mới, và xử lý tiếp nếu có lỗi.
 5. **Kiểm thử tải chưa có bằng chứng:** Priority/retry được kiểm thử chức năng; chưa có benchmark throughput, concurrency hoặc độ bền khi Redis/service restart.
 6. **AI phụ thuộc cấu hình ngoài:** Provider mặc định tắt; kết quả external AI phụ thuộc API key, quota, network và dịch vụ nhà cung cấp. Static rules vẫn hoạt động khi provider tắt.
@@ -222,7 +221,7 @@ Mở `http://localhost:3000`, đăng nhập tài khoản sinh viên demo, nộp 
 | Redis Priority/Retry | Có queue/worker, priority theo hạn nộp, retry, lease và failed-job handling; có test Redis tích hợp trong CI. |
 | E2E/QA | Có Servlet E2E qua Jetty/fake JDBC và Node portal smoke test. |
 | CI | Workflow đã cấu hình; cần run mới trên commit chứa các sửa đổi hiện tại để kết luận xanh. |
-| Sandbox | Có runner, UI/API và Dockerfile để build image local; đã có hướng dẫn chuẩn bị và chạy trên Windows. Cần xác minh build image, Docker runtime và bind mount trên máy demo; chưa kết nối với luồng ZIP Java Servlet. |
+| Sandbox | Có runner nhiều file, UI chọn entry point, Dockerfile tại `docker/sandbox`, và mặc định bật. Image build và chạy thử chương trình 2 file trực tiếp trong Docker thành công; workflow build image + smoke test API nhiều file cần CI run mới để xác nhận. Chưa kết nối với luồng ZIP Java Servlet. |
 | Final Report | Báo cáo kỹ thuật này hoàn thiện phần mô tả yêu cầu, kiến trúc, chức năng, AI, kiểm thử và giới hạn hiện tại. |
 
 **Kết luận:** Các cấu phần chính của trách nhiệm tích hợp/QA TV5 đã được triển khai ở mức mã nguồn và có kiểm thử tự động tương ứng. Điều kiện để chốt nghiệm thu là push thay đổi và xác nhận CI xanh; đồng thời chạy thử sandbox trên Docker host của buổi demo. Báo cáo không xem hai việc xác minh đó là đã hoàn tất.

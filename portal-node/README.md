@@ -28,7 +28,7 @@ The login screen can reset a password after matching the account's registered em
 - Student login, semester/course grade overview, persistent deadline/assignment/grade/feedback notifications, profile and password settings, source upload, SHA-256 duplicate detection, Java syntax parsing, static rule checks, and personal grades.
 - Teacher course/semester grade overview, editable class enrollments and teacher assignments, per-course grade editing and manual feedback, rule configuration, assignment management, submission review, plagiarism signals, grade audit history, reports, and CSV/XLSX export.
 - Optional OpenAI or Gemini feedback, enabled only by setting the provider and its API key in `.env`. When enabled, the submitted source code is sent to that provider for feedback.
-- Optional Docker execution sandbox. It is disabled by default; submitted programs are never executed unless explicitly enabled and Docker is available.
+- Docker execution sandbox is enabled by default for student-triggered runs. Java programs run only in Docker; if Docker or the local image is unavailable, the request reports an error and never falls back to running code on the host.
 
 ## Teacher course overview
 
@@ -94,7 +94,7 @@ WITH (
 
 ## Sandbox
 
-The sandbox is disabled by default. To run it locally on Windows with Docker Desktop:
+The sandbox is enabled by default. It runs only when a student explicitly presses **Run in sandbox**; it never runs code during upload or analysis. Set `SANDBOX_ENABLED=false` to disable it. Java code is never run directly on the portal host.
 
 1. Start Docker Desktop and make sure it uses **Linux containers**. In PowerShell, confirm the daemon is ready:
 
@@ -102,10 +102,10 @@ The sandbox is disabled by default. To run it locally on Windows with Docker Des
    docker info
    ```
 
-2. From the `portal-node` directory, build the local Java runtime image:
+2. From the repository root, build the local Java runtime image:
 
    ```powershell
-   docker build -t aita-java-sandbox:8 -f sandbox\Dockerfile sandbox
+   docker build -t aita-java-sandbox:8 -f docker\sandbox\Dockerfile docker\sandbox
    docker image inspect aita-java-sandbox:8
    ```
 
@@ -119,7 +119,7 @@ The sandbox is disabled by default. To run it locally on Windows with Docker Des
 
    If the `aita-redis` container already exists but is stopped, run `docker start aita-redis` instead.
 
-4. Install Node.js 22 or newer. Copy `.env.example` to `.env` if needed, then set:
+4. Install Node.js 22 or newer. From `portal-node`, copy `.env.example` to `.env` if needed and confirm:
 
    ```env
    REDIS_URL=redis://127.0.0.1:6379
@@ -127,18 +127,18 @@ The sandbox is disabled by default. To run it locally on Windows with Docker Des
    SANDBOX_IMAGE=aita-java-sandbox:8
    ```
 
-5. In PowerShell, start the portal:
+5. In PowerShell, start the portal from `portal-node`:
 
    ```powershell
    npm.cmd install
    npm.cmd start
    ```
 
-6. Open `http://localhost:3000`, sign in as a demo student, submit a `.java` file with a `main` method, and open **Analysis & fixes**. Select **Run in sandbox**. The output appears below the button. The API endpoint is `POST /api/student/submissions/:submissionId/run`; it only runs a Java source file owned by the authenticated student.
+6. Open `http://localhost:3000` and sign in as a demo student. In **Submit a file**, select one Java file or multiple `.java` files (up to 20 files, 512 KB combined). For multiple files, select the file containing `public static void main(String[] args)` as **Java program entry point**. The portal analyzes that entry-point file and retains the selected Java files together for sandbox execution. In **Analysis & fixes**, select **Run in sandbox**; the runner compiles all submitted source files before running the selected entry-point class. The output appears below the button. The API endpoint is `POST /api/student/submissions/:submissionId/run`; it only runs Java source attached to a submission owned by the authenticated student.
 
-The runner executes each program in a fresh container with no network, a read-only source mount, a non-root user, dropped Linux capabilities, `no-new-privileges`, 128 MiB memory, 0.5 CPU, 32 processes, a 12-second timeout, and bounded output. The named container is explicitly killed if it exceeds the timeout. The submitted source is removed from the server's temporary directory after the run. Do not expose this demo portal directly to the public internet.
+The runner compiles and executes in a fresh container with no network, a read-only source mount, a non-root user, dropped Linux capabilities, `no-new-privileges`, 128 MiB memory, 0.5 CPU, 32 processes, a 12-second timeout, and bounded output. Filenames must be unique Java class names ending in `.java`. The named container is explicitly killed if it exceeds the timeout. Submitted sources are removed from the server's temporary directory after the run. Do not expose this demo portal directly to the public internet.
 
-If PowerShell says the Docker engine cannot be reached, start Docker Desktop and wait for `docker info` to complete successfully. If the image is missing, rebuild it with the command in step 2. To stop the optional Redis container after the demo:
+If PowerShell says the Docker engine cannot be reached, start Docker Desktop and wait for `docker info` to complete successfully. If Docker is down or the image is missing, sandbox requests return an actionable error and do not execute the program on the host. Rebuild the image with the command in step 2. To disable the sandbox, set `SANDBOX_ENABLED=false` in `.env`. To stop the optional Redis container after the demo:
 
 ```powershell
 docker rm -f aita-redis
@@ -160,7 +160,7 @@ npm.cmd test
 - `PATCH /api/me/password`
 - `GET /api/me/notifications`
 - `PATCH /api/me/notifications/:notificationId/read`
-- `POST /api/student/submissions` (multipart field `sourceFile`)
+- `POST /api/student/submissions` (repeat multipart field `sourceFile` for multiple Java files; `mainFile` selects the entry point)
 - `GET /api/student/submissions`
 - `GET /api/student/grades`
 - `GET /api/student/course-grades`

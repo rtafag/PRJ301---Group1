@@ -319,6 +319,11 @@ function renderTeacherSubmissionList(submissions) {
 
 function renderTeacherSubmissionDetail(submission, auditEntries) {
   const sourceLines = String(submission.sourceCode ?? '').split('\n');
+  const sourceFiles = Array.isArray(submission.sourceFiles) && submission.sourceFiles.length
+    ? submission.sourceFiles
+    : submission.sourceCode !== null && submission.sourceCode !== undefined
+      ? [{ fileName: submission.fileName, sourceCode: submission.sourceCode }]
+      : [];
   const findings = submission.analysis?.violations ?? [];
   const findingRows = findings.map((finding) => {
     const lineNumber = Number(finding.lineNumber);
@@ -328,7 +333,7 @@ function renderTeacherSubmissionDetail(submission, auditEntries) {
     <p class="assignment-course-label">Submitted ${formatDateTime(submission.submittedAt)} · Score ${formatScore(submission.score?.totalScore)} · ${escapeHtml(submission.status)}</p>
     <div class="submission-toolbar"><button class="button button-secondary" type="button" data-download-submission="${escapeHtml(submission.submissionId)}" data-owner="teacher">Download original</button>${submission.fileName.toLowerCase().endsWith('.java') ? `<button class="button button-primary" type="button" data-analyze-submission="${escapeHtml(submission.submissionId)}">Run analysis</button>` : ''}</div>
     <div class="analysis-list"><section class="analysis-entry"><div class="section-heading"><h2>Rule violations</h2><span class="pill">${findings.length} findings</span></div>${findingRows || emptyState('No configured rule violations found.')}</section></div>
-    ${submission.sourceCode !== null && submission.sourceCode !== undefined ? `<pre class="source-code">${escapeHtml(submission.sourceCode)}</pre>` : `<p class="notice">This file type is stored as an original attachment. Download it to view the contents.</p>`}
+    ${sourceFiles.length ? sourceFiles.map((file) => `<section class="source-file"><h3>${escapeHtml(file.fileName)}</h3><pre class="source-code">${escapeHtml(file.sourceCode)}</pre></section>`).join('') : `<p class="notice">This file type is stored as an original attachment. Download it to view the contents.</p>`}
     <div class="teacher-review-grid">
       ${submission.fileName.toLowerCase().endsWith('.java') ? `<form id="submission-grade-form" class="content-form" data-submission-id="${escapeHtml(submission.submissionId)}">
         <h3>Edit grade</h3><label class="field-label">Score<input name="totalScore" type="number" min="0" max="10" step="0.1" value="${escapeHtml(submission.score?.totalScore ?? 0)}" required></label>
@@ -526,13 +531,15 @@ async function renderStudentView() {
   if (state.view === 'submit') {
     state.studentAssignments = (await api('/api/student/assignments')).assignments;
     const assignmentOptions = state.studentAssignments.map((assignment) => `<option value="${escapeHtml(assignment.assignmentId)}" ${assignment.status === 'Closed' ? 'disabled' : ''}>${escapeHtml(assignment.courseCode)} · ${escapeHtml(assignment.title)} · ${escapeHtml(assignment.status)}</option>`).join('');
-    return `<div class="section-heading"><h2>Submit a file</h2><p>Any file type · 512 KB maximum</p></div>
+    return `<div class="section-heading"><h2>Submit files</h2><p>One file or up to 20 Java files · 512 KB combined</p></div>
       <form id="upload-form" class="content-form">
         <label class="field-label" for="submission-assignment">Assignment</label>
         <select id="submission-assignment" name="assignmentId"><option value="">Unassigned practice upload</option>${assignmentOptions}</select>
-        <label class="field-label" for="source-file">Source file</label>
-        <input id="source-file" name="sourceFile" type="file" required>
-        <p class="login-note">Java files are checked by the rule engine. Other file types are stored as submitted and can be downloaded by your teacher. Maximum size: 512 KB.</p>
+        <label class="field-label" for="source-file">Source file(s)</label>
+        <input id="source-file" name="sourceFile" type="file" multiple required>
+        <label id="main-source-file-label" class="field-label" for="main-source-file" hidden>Java program entry point</label>
+        <select id="main-source-file" name="mainFile" hidden disabled></select>
+        <p class="login-note">Submit one file of any type or up to 20 Java files (512 KB combined). For multiple Java files, choose the file containing <code>main</code>. All selected Java files are compiled and run together in Docker.</p>
         <button class="button button-primary" type="submit">Submit file</button>
       </form>`;
   }
@@ -560,11 +567,12 @@ async function renderStudentView() {
     <div class="analysis-list">${analyses.map((submission) => `
       <section class="analysis-entry">
         <div class="section-heading"><h2>${escapeHtml(submission.fileName)}</h2><span class="pill ${submission.analysis.syntaxValid ? '' : 'warn'}">${submission.analysis.syntaxValid ? 'Syntax valid' : 'Needs review'}</span></div>
+        ${submission.fileNames?.length > 1 ? `<p class="login-note">Submitted files: ${submission.fileNames.map(escapeHtml).join(', ')}</p>` : ''}
         <p>${escapeHtml(submission.analysis.aiFeedback || 'No feedback available.')}</p>
         ${submission.manualFeedback ? `<p><strong>Teacher feedback:</strong> ${escapeHtml(submission.manualFeedback)}</p>` : ''}
         ${submission.analysis.providerWarning ? `<p class="login-note">External AI feedback unavailable: ${escapeHtml(submission.analysis.providerWarning)}</p>` : ''}
         ${submission.analysis.violations?.length ? `<div class="finding-list">${submission.analysis.violations.map((finding) => `<div class="finding"><strong>${escapeHtml(finding.ruleCode || finding.ruleName)}</strong> Line ${escapeHtml(finding.lineNumber)}: ${escapeHtml(finding.suggestedFix)}</div>`).join('')}</div>` : emptyState('No configured rule violations found.')}
-        ${submission.hasSourceCode ? `<button class="button button-secondary run-sandbox" type="button" data-submission-id="${escapeHtml(submission.submissionId)}">Run in sandbox</button>` : ''}
+        ${submission.hasJavaSource ? `<button class="button button-secondary run-sandbox" type="button" data-submission-id="${escapeHtml(submission.submissionId)}">Run in sandbox</button>` : ''}
       </section>`).join('')}</div>`;
 }
 
@@ -1011,6 +1019,25 @@ workspace.addEventListener('input', (event) => {
 });
 
 workspace.addEventListener('change', (event) => {
+  if (event.target.id === 'source-file') {
+    const fileInput = event.target;
+    const mainFileSelect = workspace.querySelector('#main-source-file');
+    if (!mainFileSelect) return;
+    const selectedFiles = [...fileInput.files];
+    const mainFileLabel = workspace.querySelector('#main-source-file-label');
+    mainFileSelect.replaceChildren(...selectedFiles.map((file) => {
+      const option = document.createElement('option');
+      option.value = file.name;
+      option.textContent = file.name;
+      return option;
+    }));
+    const multipleJavaFiles = selectedFiles.length > 1 && selectedFiles.every((file) => file.name.toLowerCase().endsWith('.java'));
+    mainFileSelect.hidden = !multipleJavaFiles;
+    mainFileLabel.hidden = !multipleJavaFiles;
+    mainFileSelect.disabled = !multipleJavaFiles;
+    mainFileSelect.required = multipleJavaFiles;
+    return;
+  }
   if (event.target.id === 'class-course-select') {
     state.selectedClassCode = event.target.value;
     renderView();
@@ -1104,7 +1131,7 @@ workspace.addEventListener('submit', async (event) => {
 
     if (form.id === 'upload-form') {
       const result = await api('/api/student/submissions', { method: 'POST', body: new FormData(form) });
-      showToast(`Submitted ${result.submission.fileName}.`);
+      showToast(`Submitted ${result.submission.fileNames.length} file(s).`);
       state.view = 'analysis';
       await renderView();
       return;

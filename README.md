@@ -53,7 +53,8 @@ Luồng xử lý từ lúc nộp bài đến khi xuất kết quả phân tích 
 ```mermaid
 flowchart TD
     subgraph Client_Side ["1. Giao diện & Tiếp nhận"]
-        SV["Sinh viên / Giảng viên"] -->|Nộp Source Code / ZIP| SP["Submission Portal (Servlet/JSP - MVC2)"]
+        SV["Sinh viên / Giảng viên"] -->|Nộp ZIP| SP["Submission Portal (Servlet/JSP - MVC2)"]
+        SV -->|Nộp Java / yêu cầu chạy| NodePortal["Submission Portal (Node.js)"]
     end
 
     subgraph Security_Gate ["2. Tầng Bảo mật & Toàn vẹn"]
@@ -62,16 +63,18 @@ flowchart TD
     end
 
     subgraph Queue_System ["3. Điều phối Hàng đợi"]
-        FilterSec -->|Đẩy tác vụ chấm| RedisQ["Redis Grading Queue (Priority & Retry)"]
+        NodePortal -->|Đẩy tác vụ phân tích| RedisQ["Redis Grading Queue (Priority & Retry)"]
     end
 
-    subgraph Sandbox_Environment ["4. Docker Sandbox Cô lập"]
-        RedisQ -->|Phân phối tác vụ| DockerSB["Docker Sandbox (Giới hạn CPU, RAM, No Network)"]
-        DockerSB --> AST_Core["AST Core Engine (JavaParser)"]
-        AST_Core -->|Sinh cấu trúc chuẩn| AST_JSON["JSON AST Schema"]
+    subgraph Sandbox_Environment ["4. Docker Sandbox Cô lập (Node portal, chạy theo yêu cầu)"]
+        NodePortal -->|Sinh viên chọn Run in sandbox| DockerSB["Docker Sandbox (Giới hạn CPU, RAM, No Network)"]
+        DockerSB -->|Chạy chương trình Java| ProgramOutput["stdout / stderr"]
+        ProgramOutput --> NodePortal
     end
 
     subgraph AI_Rule_Engine ["5. Phát hiện Lỗi & Phản hồi AI"]
+        RedisQ -->|Worker xử lý phân tích tĩnh| AST_Core["AST Core Engine (JavaParser)"]
+        AST_Core -->|Sinh cấu trúc chuẩn| AST_JSON["JSON AST Schema"]
         AST_JSON --> RuleEng["AI Rule Engine (Null check, Infinite loop, Code smell)"]
         RuleEng -->|Prompt Engineering| GenAI["OpenAI / Gemini API"]
         GenAI -->|Giải thích ngôn ngữ tự nhiên| Feedbacks["Phản hồi sư phạm & Gợi ý sửa lỗi"]

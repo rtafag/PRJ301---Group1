@@ -39,6 +39,7 @@ async function waitForAnalysis(submissionId, authorization) {
 const healthResponse = await fetch(`${baseUrl}/api/health`);
 assert.equal(healthResponse.status, 200, 'Portal health check failed');
 const health = await healthResponse.json();
+assert.equal(health.sandboxEnabled, true, 'Sandbox should be enabled by default');
 
 const student = await login('dungdang442', demoPassword, 'Student');
 const classReportAttempt = await fetch(`${baseUrl}/api/teacher/report`, {
@@ -66,12 +67,19 @@ if (!npeRule.enabled) {
 }
 
 const className = `PortalSmoke${Date.now()}`;
+const helperClassName = `${className}Helper`;
 const form = new FormData();
 form.append(
   'sourceFile',
-  new Blob([`public class ${className} { public static void main(String[] args) { System.out.println("AITA sandbox OK"); } public Object value() { return null; } }`]),
+  new Blob([`public class ${className} { public static void main(String[] args) { System.out.println(${helperClassName}.message()); } public Object value() { return null; } }`]),
   `${className}.java`
 );
+form.append(
+  'sourceFile',
+  new Blob([`public class ${helperClassName} { public static String message() { return "AITA sandbox OK"; } }`]),
+  `${helperClassName}.java`
+);
+form.set('mainFile', `${className}.java`);
 const uploadResponse = await fetch(`${baseUrl}/api/student/submissions`, {
   method: 'POST',
   headers: { Authorization: `Bearer ${student.token}` },
@@ -81,6 +89,8 @@ assert.equal(uploadResponse.status, 201, 'Student upload failed');
 const { submission: queuedSubmission } = await uploadResponse.json();
 assert.equal(queuedSubmission.hasSourceCode, true, 'Submission metadata should expose code availability');
 assert.equal(Object.hasOwn(queuedSubmission, 'sourceCode'), false, 'Submission API must not expose submitted source text');
+assert.deepEqual(queuedSubmission.fileNames.sort(), [`${className}.java`, `${helperClassName}.java`].sort());
+assert.equal(Object.hasOwn(queuedSubmission, 'sourceFiles'), false, 'Submission API must not expose all submitted source text');
 assert.notEqual(queuedSubmission.status, 'Queue Failed', 'Java submission should enter the analysis queue');
 const submission = await waitForAnalysis(queuedSubmission.submissionId, `Bearer ${student.token}`);
 assert.equal(submission.analysis.syntaxValid, true);
@@ -97,14 +107,9 @@ const sandboxResponse = await fetch(`${baseUrl}/api/student/submissions/${submis
 });
 assert.equal(sandboxResponse.status, 200, 'Student should be able to request sandbox execution for their Java submission');
 const { sandbox } = await sandboxResponse.json();
-if (health.sandboxEnabled) {
-  assert.equal(sandbox.available, true, sandbox.message || 'Enabled sandbox should be available');
-  assert.equal(sandbox.exitCode, 0, sandbox.stderr);
-  assert.match(sandbox.stdout, /AITA sandbox OK/);
-} else {
-  assert.equal(sandbox.available, false, 'Sandbox should report disabled when it is not enabled');
-  assert.match(sandbox.message, /disabled/i);
-}
+assert.equal(sandbox.available, true, sandbox.message || 'Enabled sandbox should be available');
+assert.equal(sandbox.exitCode, 0, sandbox.stderr);
+assert.match(sandbox.stdout, /AITA sandbox OK/);
 
 const coursesResponse = await fetch(`${baseUrl}/api/teacher/courses`, {
   headers: { Authorization: `Bearer ${teacher.token}` }
