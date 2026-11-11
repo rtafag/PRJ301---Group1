@@ -5,6 +5,7 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.group1.filter.AuthFilter;
 import com.group1.model.Users;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Proxy;
@@ -12,13 +13,16 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
+import javax.servlet.FilterChain;
+import javax.servlet.ServletException;
+import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
 import org.junit.Test;
-import javax.servlet.ServletException;
 
 public class DashboardAccessTest {
     @Test
@@ -41,6 +45,32 @@ public class DashboardAccessTest {
         assertTrue(exchange.forwarded);
         assertFalse(exchange.databaseAccessed);
         assertEquals("no-store", exchange.cacheControl);
+    }
+
+    @Test
+    public void teacherDashboardRouteIsRegisteredOnItsController() throws Exception {
+        WebServlet servlet = TeacherDashboardController.class.getAnnotation(WebServlet.class);
+        assertTrue(Arrays.asList(servlet.value()).contains("/teacher/dashboard"));
+    }
+
+    @Test
+    public void authFilterRejectsStudentsFromTeacherDashboard() throws Exception {
+        for (String role : new String[] {"student", "admin"}) {
+            Exchange exchange = new Exchange();
+            HttpServletRequest request = request(role, role + "-1", role + "-1",
+                    "/teacher/dashboard", exchange);
+            FilterChain chain = proxy(FilterChain.class, (proxy, method, args) -> {
+                if ("doFilter".equals(method.getName())) {
+                    exchange.filterChainCalled = true;
+                }
+                return defaultValue(method.getReturnType());
+            });
+
+            new AuthFilter().doFilter(request, response(exchange), chain);
+
+            assertEquals(HttpServletResponse.SC_FORBIDDEN, exchange.errorStatus);
+            assertFalse(exchange.filterChainCalled);
+        }
     }
 
     @Test(expected = ServletException.class)
@@ -74,8 +104,13 @@ public class DashboardAccessTest {
     }
 
     private static Exchange invokeHome(String role, String userId, String sessionUserId) throws Exception {
+        return invokeHome(role, userId, sessionUserId, "/home");
+    }
+
+    private static Exchange invokeHome(String role, String userId, String sessionUserId, String servletPath)
+            throws Exception {
         Exchange exchange = new Exchange();
-        HttpServletRequest request = request(role, userId, sessionUserId, exchange);
+        HttpServletRequest request = request(role, userId, sessionUserId, servletPath, exchange);
         HttpServletResponse response = response(exchange);
         new TestHomeController(exchange).handleGet(request, response);
         return exchange;
@@ -83,14 +118,14 @@ public class DashboardAccessTest {
 
     private static Exchange invokeScores(String role, String userId, String sessionUserId) throws Exception {
         Exchange exchange = new Exchange();
-        HttpServletRequest request = request(role, userId, sessionUserId, exchange);
+        HttpServletRequest request = request(role, userId, sessionUserId, "/scores", exchange);
         HttpServletResponse response = response(exchange);
         new TestScoreController(exchange).handleGet(request, response);
         return exchange;
     }
 
     private static HttpServletRequest request(String role, String userId, String sessionUserId,
-            Exchange exchange) {
+            String servletPath, Exchange exchange) {
         HttpSession session = null;
         if (role != null) {
             Map<String, Object> attributes = new HashMap<>();
@@ -111,6 +146,9 @@ public class DashboardAccessTest {
             }
             if ("getContextPath".equals(method.getName())) {
                 return "/aita";
+            }
+            if ("getServletPath".equals(method.getName())) {
+                return servletPath;
             }
             if ("getRequestDispatcher".equals(method.getName())) {
                 return proxy(javax.servlet.RequestDispatcher.class, (dispatcher, dispatchMethod, dispatchArgs) -> {
@@ -197,6 +235,7 @@ public class DashboardAccessTest {
         private int errorStatus;
         private boolean forwarded;
         private boolean databaseAccessed;
+        private boolean filterChainCalled;
         private String cacheControl;
     }
 

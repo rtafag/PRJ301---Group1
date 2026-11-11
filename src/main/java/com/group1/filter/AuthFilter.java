@@ -88,6 +88,11 @@ public class AuthFilter implements Filter {
             response.sendError(HttpServletResponse.SC_FORBIDDEN, "Only teachers may view all scores.");
             return;
         }
+        if ("/teacher/dashboard".equals(path) && !"teacher".equals(role)) {
+            response.sendError(HttpServletResponse.SC_FORBIDDEN,
+                    "Only teachers may access the teacher dashboard.");
+            return;
+        }
 
         response.setHeader("Cache-Control", "no-store");
         if ("/student/submissions".equals(path)) {

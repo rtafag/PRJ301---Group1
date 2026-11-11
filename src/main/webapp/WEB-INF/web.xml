@@ -23,6 +23,10 @@
     </filter-mapping>
     <filter-mapping>
         <filter-name>authFilter</filter-name>
+        <url-pattern>/teacher/dashboard</url-pattern>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>authFilter</filter-name>
         <url-pattern>/analysis-dashboard</url-pattern>
     </filter-mapping>
     <filter-mapping>

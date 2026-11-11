@@ -28,6 +28,9 @@
         <c:if test="${dashboardRole eq 'student' or dashboardRole eq 'teacher' or dashboardRole eq 'admin'}">
             <a href="<c:out value='${pageContext.request.contextPath}' />/analysis-dashboard">Kết quả phân tích AST</a>
         </c:if>
+        <c:if test="${dashboardRole eq 'teacher'}">
+            <a href="<c:out value='${pageContext.request.contextPath}' />/teacher/dashboard">Bảng điều khiển giảng viên</a>
+        </c:if>
         <c:if test="${dashboardRole eq 'teacher' or dashboardRole eq 'admin'}">
             <a href="<c:out value='${pageContext.request.contextPath}' />/scores">Xem bảng điểm</a>
         </c:if>
